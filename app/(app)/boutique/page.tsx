@@ -5,14 +5,16 @@ import {
   Package, Warehouse, Truck, History, ClipboardList,
   BarChart2, Plus, Search, Edit2, Printer, ShoppingCart,
   ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle,
-  Check, X, ChevronDown, Filter,
+  Check, X, ChevronDown, Filter, Trash2,
 } from "lucide-react";
 import {
   useProduits, useFournisseurs, useCommandes, useMouvements, useVentes,
   creerVente, ajusterStock, creerProduit,
   creerCommande, changerStatutCommande, recevoirCommande,
-  type Produit, type CommandeFournisseur,
+  useEntrepots, creerEntrepot, modifierEntrepot, supprimerEntrepot,
+  type Produit, type CommandeFournisseur, type Entrepot,
 } from "@/lib/hooks-stock";
+import { useProfiles } from "@/lib/hooks2";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
 import {
@@ -66,6 +68,48 @@ export default function BoutiquePage() {
   const { data: commandes, refetch: refetchCommandes } = useCommandes();
   const { data: mouvements, refetch: refetchMouvements } = useMouvements();
   const { data: ventes, refetch: refetchVentes } = useVentes();
+  const { data: entrepotsList, refetch: refetchEntrepots } = useEntrepots();
+  const { data: profiles } = useProfiles();
+
+  // Gestion entrepôts
+  const [openNewEntrepot, setOpenNewEntrepot] = useState(false);
+  const [openEntrepot, setOpenEntrepot] = useState<Entrepot | null>(null);
+  const [entForm, setEntForm] = useState({ nom: "", ville: "", adresse: "", responsable_id: "" });
+  const [entBusy, setEntBusy] = useState(false);
+  const [entErr, setEntErr] = useState<string | null>(null);
+
+  function ouvrirNewEntrepot() {
+    setEntErr(null); setEntForm({ nom: "", ville: "", adresse: "", responsable_id: "" }); setOpenNewEntrepot(true);
+  }
+  function ouvrirEditEntrepot(e: Entrepot) {
+    setEntErr(null);
+    setEntForm({ nom: e.nom, ville: e.ville ?? "", adresse: e.adresse ?? "", responsable_id: e.responsable_id ?? "" });
+    setOpenEntrepot(e);
+  }
+  async function submitNewEntrepot() {
+    if (!entForm.nom.trim()) { setEntErr("Le nom est requis."); return; }
+    setEntBusy(true); setEntErr(null);
+    try {
+      await creerEntrepot({ nom: entForm.nom.trim(), ville: entForm.ville || undefined, adresse: entForm.adresse || undefined, responsable_id: entForm.responsable_id || undefined });
+      setOpenNewEntrepot(false); refetchEntrepots();
+    } catch (e: any) { setEntErr(e?.message ?? "Erreur lors de la création."); }
+    setEntBusy(false);
+  }
+  async function submitEditEntrepot() {
+    if (!openEntrepot) return;
+    if (!entForm.nom.trim()) { setEntErr("Le nom est requis."); return; }
+    setEntBusy(true); setEntErr(null);
+    try {
+      await modifierEntrepot(openEntrepot.id, { nom: entForm.nom.trim(), ville: entForm.ville || null, adresse: entForm.adresse || null, responsable_id: entForm.responsable_id || null });
+      setOpenEntrepot(null); refetchEntrepots();
+    } catch (e: any) { setEntErr(e?.message ?? "Erreur lors de la modification."); }
+    setEntBusy(false);
+  }
+  async function removeEntrepot(e: Entrepot) {
+    if (!confirm(`Supprimer l'entrepôt « ${e.nom} » ? (Les produits existants ne sont pas supprimés.)`)) return;
+    try { await supprimerEntrepot(e.id); refetchEntrepots(); }
+    catch (err: any) { alert(err?.message ?? "Erreur."); }
+  }
 
   // Filtres catalogue
   const [q, setQ] = useState("");
@@ -360,22 +404,38 @@ export default function BoutiquePage() {
       {/* ── ENTREPÔTS ── */}
       {tab === "entrepots" && (
         <div>
-          {entrepots.filter(e => e !== "tout").map(ent => {
-            const prods = produits.filter(p => p.entrepot === ent);
+          <div className="mb-4 flex items-center justify-between">
+            <div className="text-[13px] text-ink-500">{entrepotsList.length} entrepôt(s)</div>
+            <Btn onClick={ouvrirNewEntrepot}><Plus size={15} /> Nouvel entrepôt</Btn>
+          </div>
+          {entrepotsList.length === 0 && (
+            <Card className="p-6 text-center text-[13px] text-ink-400">Aucun entrepôt. Créez-en un pour commencer.</Card>
+          )}
+          {entrepotsList.map(ent => {
+            const prods = produits.filter(p => p.entrepot === ent.nom);
             const valTot = prods.reduce((s, p) => s + p.valeur_vente, 0);
             const nbAlertes = prods.filter(p => ["critique","rupture"].includes(p.niveau_stock)).length;
             return (
-              <div key={ent} className="mb-5">
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink/5">
-                    <Warehouse size={18} className="text-ink-600" />
-                  </span>
-                  <div>
-                    <h3 className="display text-base font-bold text-ink">{ent}</h3>
-                    <div className="text-[12px] text-ink-500">
-                      {prods.length} produits · valeur {formatXOF(valTot)}
-                      {nbAlertes > 0 && <span className="ml-2 text-ember-600">{nbAlertes} alerte{nbAlertes > 1 ? "s" : ""}</span>}
+              <div key={ent.id} className="mb-5">
+                <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink/5">
+                      <Warehouse size={18} className="text-ink-600" />
+                    </span>
+                    <div>
+                      <h3 className="display text-base font-bold text-ink">{ent.nom}</h3>
+                      <div className="text-[12px] text-ink-500">
+                        {ent.ville ? ent.ville + " · " : ""}{prods.length} produits · valeur {formatXOF(valTot)}
+                        {nbAlertes > 0 && <span className="ml-2 text-ember-600">{nbAlertes} alerte{nbAlertes > 1 ? "s" : ""}</span>}
+                      </div>
+                      <div className="text-[11px] text-ink-400 mt-0.5">Responsable : {ent.responsable_nom ?? "non assigné"}</div>
                     </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => ouvrirEditEntrepot(ent)} title="Modifier"
+                      className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ink"><Edit2 size={15} /></button>
+                    <button onClick={() => removeEntrepot(ent)} title="Supprimer"
+                      className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ember-600"><Trash2 size={15} /></button>
                   </div>
                 </div>
                 <Card className="overflow-hidden">
@@ -402,6 +462,9 @@ export default function BoutiquePage() {
                             </td>
                           </tr>
                         ))}
+                        {prods.length === 0 && (
+                          <tr><td colSpan={5} className="px-5 py-6 text-center text-ink-400 text-[13px]">Aucun produit dans cet entrepôt.</td></tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -811,7 +874,7 @@ export default function BoutiquePage() {
           </Field>
           <Field label="Entrepôt">
             <select className={inputCls} value={prodForm.entrepot} onChange={e => setProdForm(f=>({...f,entrepot:e.target.value}))}>
-              {entrepots.filter(e=>e!=="tout").map(e=><option key={e}>{e}</option>)}
+              {(entrepotsList.length ? entrepotsList.map(e => e.nom) : entrepots.filter(e=>e!=="tout")).map(e=><option key={e}>{e}</option>)}
             </select>
           </Field>
           <Field label="Prix de vente (XOF)"><input className={inputCls+" num"} type="number" value={prodForm.prix_unitaire} onChange={e => setProdForm(f=>({...f,prix_unitaire:e.target.value}))} /></Field>
@@ -878,6 +941,45 @@ export default function BoutiquePage() {
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpenNouvelleCommande(false)}>Annuler</Btn>
           <Btn onClick={submitCommande} className={cmdBusy ? "opacity-50" : ""}>{cmdBusy ? "Création…" : "Créer la commande"}</Btn>
+        </div>
+      </Modal>
+
+      {/* ── Modals entrepôt ── */}
+      <Modal open={openNewEntrepot} onClose={() => setOpenNewEntrepot(false)} title="Nouvel entrepôt">
+        <Field label="Nom"><input className={inputCls} value={entForm.nom} onChange={e => setEntForm(f => ({ ...f, nom: e.target.value }))} placeholder="Entrepôt Yako Centre" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Ville"><input className={inputCls} value={entForm.ville} onChange={e => setEntForm(f => ({ ...f, ville: e.target.value }))} placeholder="Yako" /></Field>
+          <Field label="Responsable">
+            <select className={inputCls} value={entForm.responsable_id} onChange={e => setEntForm(f => ({ ...f, responsable_id: e.target.value }))}>
+              <option value="">— Aucun —</option>
+              {profiles.map((p: any) => <option key={p.id} value={p.id}>{p.nom} ({p.role})</option>)}
+            </select>
+          </Field>
+        </div>
+        <Field label="Adresse"><input className={inputCls} value={entForm.adresse} onChange={e => setEntForm(f => ({ ...f, adresse: e.target.value }))} /></Field>
+        {entErr && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{entErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setOpenNewEntrepot(false)}>Annuler</Btn>
+          <Btn onClick={submitNewEntrepot} className={entBusy ? "opacity-50" : ""}>{entBusy ? "Création…" : "Créer l'entrepôt"}</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={!!openEntrepot} onClose={() => setOpenEntrepot(null)} title={`Modifier — ${openEntrepot?.nom ?? ""}`}>
+        <Field label="Nom"><input className={inputCls} value={entForm.nom} onChange={e => setEntForm(f => ({ ...f, nom: e.target.value }))} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Ville"><input className={inputCls} value={entForm.ville} onChange={e => setEntForm(f => ({ ...f, ville: e.target.value }))} /></Field>
+          <Field label="Responsable">
+            <select className={inputCls} value={entForm.responsable_id} onChange={e => setEntForm(f => ({ ...f, responsable_id: e.target.value }))}>
+              <option value="">— Aucun —</option>
+              {profiles.map((p: any) => <option key={p.id} value={p.id}>{p.nom} ({p.role})</option>)}
+            </select>
+          </Field>
+        </div>
+        <Field label="Adresse"><input className={inputCls} value={entForm.adresse} onChange={e => setEntForm(f => ({ ...f, adresse: e.target.value }))} /></Field>
+        {entErr && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{entErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setOpenEntrepot(null)}>Annuler</Btn>
+          <Btn onClick={submitEditEntrepot} className={entBusy ? "opacity-50" : ""}>{entBusy ? "…" : "Enregistrer"}</Btn>
         </div>
       </Modal>
     </div>

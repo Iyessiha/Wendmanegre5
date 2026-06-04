@@ -314,3 +314,49 @@ export async function ajusterStock(produit_id: string, quantite: number, motif: 
     });
   } catch (e) { console.warn("Ajustement en mode demo:", e); }
 }
+
+// ── Entrepôts (CRUD complet) ──────────────────────────────
+
+export interface Entrepot {
+  id: string;
+  nom: string;
+  ville: string | null;
+  adresse: string | null;
+  responsable_id: string | null;
+  responsable_nom?: string | null;
+  actif: boolean;
+}
+
+export function useEntrepots() {
+  const [data, setData] = useState<Entrepot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    try {
+      const { data: rows, error } = await (getClient() as any)
+        .from("entrepots").select("*, responsable:profiles(nom)").eq("actif", true).order("nom");
+      if (error) throw error;
+      setData((rows ?? []).map((e: any) => ({ ...e, responsable_nom: e.responsable?.nom ?? null })));
+    } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
+}
+
+export async function creerEntrepot(input: { nom: string; ville?: string; adresse?: string; responsable_id?: string }): Promise<void> {
+  const { error } = await (getClient() as any).from("entrepots").insert({
+    nom: input.nom, ville: input.ville || null, adresse: input.adresse || null,
+    responsable_id: input.responsable_id || null, actif: true,
+  });
+  if (error) throw error;
+}
+
+export async function modifierEntrepot(id: string, patch: { nom?: string; ville?: string | null; adresse?: string | null; responsable_id?: string | null }): Promise<void> {
+  const { error } = await (getClient() as any).from("entrepots").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function supprimerEntrepot(id: string): Promise<void> {
+  const { error } = await (getClient() as any).from("entrepots").update({ actif: false }).eq("id", id);
+  if (error) throw error;
+}

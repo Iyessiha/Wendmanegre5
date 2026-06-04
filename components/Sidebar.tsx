@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, HandCoins, Wallet,
-  Package, Settings, LogOut, Store, Calculator, UserCog,
+  Package, Settings, LogOut, Store, Calculator, UserCog, FileText,
 } from "lucide-react";
 import { ENTREPRISE } from "@/lib/data";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
@@ -17,6 +17,7 @@ const navAdmin = [
   { href: "/prets",        label: "Prêts & encours",   icon: HandCoins       },
   { href: "/caisses",      label: "Caisses",            icon: Wallet          },
   { href: "/boutique",     label: "Boutique & stock",   icon: Package         },
+  { href: "/facturation",  label: "Facturation",        icon: FileText        },
   { href: "/comptabilite", label: "Comptabilité",       icon: Calculator      },
   { href: "/grh",          label: "Ressources humaines",icon: UserCog         },
   { href: "/parametres",   label: "Paramètres",         icon: Settings        },
