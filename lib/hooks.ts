@@ -286,9 +286,13 @@ export function useProduits(): UseResult<Produit[]> {
 
 export interface DashboardStats {
   encours:           number;
+  encoursPrets:      number;
+  encoursFactures:   number;
   tresorerie:        number;
   nbCommerçants:     number;
   nbImpayes:         number;
+  nbImpayesPrets:    number;
+  nbImpayesFactures: number;
   tauxRecouvrement:  number;
   enRetard:          PretEncours[];
   parVille:          { ville: string; montant: number }[];
@@ -301,7 +305,8 @@ export interface DashboardStats {
 
 export function useDashboardStats(): { stats: DashboardStats; loading: boolean } {
   const [stats, setStats] = useState<DashboardStats>({
-    encours: 0, tresorerie: 0, nbCommerçants: 0, nbImpayes: 0,
+    encours: 0, encoursPrets: 0, encoursFactures: 0,
+    tresorerie: 0, nbCommerçants: 0, nbImpayes: 0, nbImpayesPrets: 0, nbImpayesFactures: 0,
     tauxRecouvrement: 0, enRetard: [], parVille: [], parType: [], activiteRecente: [],
   });
   const [loading, setLoading] = useState(true);
@@ -309,24 +314,36 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean }
   useEffect(() => {
     async function load() {
       const sb = getClient() as any;
-      const [pretsRes, caissesRes, clientsRes, rembRes] = await Promise.all([
+      const [pretsRes, caissesRes, clientsRes, rembRes, facturesRes] = await Promise.all([
         sb.from("v_prets_encours").select("*"),
         sb.from("caisses").select("solde").eq("actif", true),
         sb.from("clients").select("*", { count: "exact", head: true }).eq("actif", true),
         sb.from("remboursements").select("montant,pret_id,date_remb,prets(client_id,clients(nom))").order("date_remb", { ascending: false }).limit(6),
+        sb.from("v_factures").select("client_ville,reste_a_payer,montant_total,total_paye,statut").neq("statut","annulee"),
       ]);
 
       const prets: PretEncours[] = (pretsRes.data ?? []) as PretEncours[];
       const actifs = prets.filter(p => p.statut !== "rembourse" && p.statut !== "annule");
-      const encours = actifs.reduce((s, p) => s + (p.reste_a_payer ?? 0), 0);
+      const encoursPrets = actifs.reduce((s, p) => s + (p.reste_a_payer ?? 0), 0);
       const tresorerie = (caissesRes.data ?? []).reduce((s: number, c: any) => s + c.solde, 0);
       const totalOctroye = prets.reduce((s, p) => s + p.montant, 0);
       const totalRemb = prets.reduce((s, p) => s + p.total_rembourse, 0);
-      const tauxRecouvrement = totalOctroye > 0 ? (totalRemb / totalOctroye) * 100 : 0;
       const enRetard = actifs.filter(p => p.jours_retard > 0).slice(0, 5);
 
+      // Factures
+      const factures = (facturesRes.data ?? []) as any[];
+      const facturesImp = factures.filter(f => Number(f.reste_a_payer ?? 0) > 0);
+      const encoursFactures = facturesImp.reduce((s: number, f: any) => s + Number(f.reste_a_payer), 0);
+      const encours = encoursPrets + encoursFactures;
+      const totalFactures = factures.reduce((s: number, f: any) => s + Number(f.montant_total), 0);
+      const totalFacturesPaye = factures.reduce((s: number, f: any) => s + Number(f.total_paye ?? 0), 0);
+      const tauxRecouvrement = (totalOctroye + totalFactures) > 0
+        ? ((totalRemb + totalFacturesPaye) / (totalOctroye + totalFactures)) * 100 : 0;
+
+      // Encours par ville : prêts + factures fusionnés
       const parVille: Record<string, number> = {};
-      actifs.forEach(p => { parVille[p.client_ville] = (parVille[p.client_ville] ?? 0) + (p.reste_a_payer ?? 0); });
+      actifs.forEach(p => { const v = (p.client_ville || "N/C").toUpperCase(); parVille[v] = (parVille[v] ?? 0) + (p.reste_a_payer ?? 0); });
+      facturesImp.forEach((f: any) => { const v = (f.client_ville || "N/C").toUpperCase(); parVille[v] = (parVille[v] ?? 0) + Number(f.reste_a_payer); });
 
       const parType: Record<string, number> = {};
       actifs.forEach(p => { parType[p.type_operation] = (parType[p.type_operation] ?? 0) + (p.reste_a_payer ?? 0); });
@@ -344,12 +361,15 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean }
         .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
       setStats({
-        encours, tresorerie,
+        encours, encoursPrets, encoursFactures,
+        tresorerie,
         nbCommerçants: clientsRes.count ?? 0,
-        nbImpayes: actifs.length,
+        nbImpayes: actifs.length + facturesImp.length,
+        nbImpayesPrets: actifs.length,
+        nbImpayesFactures: facturesImp.length,
         tauxRecouvrement,
         enRetard,
-        parVille: Object.entries(parVille).map(([ville, montant]) => ({ ville, montant })).sort((a,b)=>b.montant-a.montant).slice(0,7),
+        parVille: Object.entries(parVille).map(([ville, montant]) => ({ ville, montant })).sort((a,b)=>b.montant-a.montant).slice(0,8),
         parType: Object.entries(parType).map(([type, montant]) => ({ type, montant })),
         activiteRecente: activite,
       });

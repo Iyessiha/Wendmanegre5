@@ -42,17 +42,29 @@ export default function AdminDashboard() {
 
       {/* KPIs globaux */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard label="Encours réseau"     value={formatXOF(stats.encours)}    sub={`${stats.nbImpayes} créances actives`}   icon={<HandCoins size={18}/>}  accent="clay" />
-        <KpiCard label="Trésorerie totale"  value={formatXOF(stats.tresorerie)} sub={`${caisses.length} caisses`}             icon={<Wallet size={18}/>}     accent="leaf" />
-        <KpiCard label="Commerçants réseau" value={String(stats.nbCommerçants)} sub="sous-distributeurs actifs"               icon={<Users size={18}/>}      accent="ink"  />
-        <KpiCard label="Taux recouvrement"  value={stats.tauxRecouvrement.toFixed(0)+"%"} sub="historique global"             icon={<TrendingUp size={18}/>} accent="gold" />
+        <KpiCard label="Encours réseau"
+          value={formatXOF(stats.encours)}
+          sub={`prêts ${formatXOFCompact(stats.encoursPrets)} · fac. ${formatXOFCompact(stats.encoursFactures)}`}
+          icon={<HandCoins size={18}/>} accent="clay" />
+        <KpiCard label="Trésorerie totale"
+          value={formatXOF(stats.tresorerie)}
+          sub={`${caisses.length} caisses`}
+          icon={<Wallet size={18}/>} accent="leaf" />
+        <KpiCard label="Commerçants réseau"
+          value={String(stats.nbCommerçants)}
+          sub={`${stats.nbImpayesFactures} fac. · ${stats.nbImpayesPrets} prêts impayés`}
+          icon={<Users size={18}/>} accent="ink" />
+        <KpiCard label="Taux recouvrement"
+          value={stats.tauxRecouvrement.toFixed(0)+"%"}
+          sub="prêts & factures combinés"
+          icon={<TrendingUp size={18}/>} accent="gold" />
       </div>
 
       {/* Graphiques */}
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
-          <h3 className="display mb-1 text-lg font-bold text-ink">Encours par localité</h3>
-          <p className="mb-4 text-[12px] text-ink-500">Montant restant dû par ville (toutes agences)</p>
+          <h3 className="display mb-1 text-lg font-bold text-ink">Encours total par localité</h3>
+          <p className="mb-4 text-[12px] text-ink-500">Prêts + factures impayées, par ville (toutes agences)</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={stats.parVille} margin={{ left: 0, right: 8 }}>
               <XAxis dataKey="ville" tick={{ fontSize: 11, fill: "#6B6157" }} axisLine={false} tickLine={false} />
@@ -64,7 +76,7 @@ export default function AdminDashboard() {
         </Card>
         <Card className="p-5">
           <h3 className="display mb-1 text-lg font-bold text-ink">Par opérateur</h3>
-          <p className="mb-2 text-[12px] text-ink-500">Répartition de l'encours</p>
+          <p className="mb-2 text-[12px] text-ink-500">Encours prêts par type d'opération</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie data={stats.parType} dataKey="montant" nameKey="type" innerRadius={45} outerRadius={80} paddingAngle={2}>
