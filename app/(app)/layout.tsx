@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // Caissier → uniquement son espace + clients + prêts en lecture
     if (role === "caissier") {
-      const allowed = ["/caisse", "/clients", "/prets"];
+      const allowed = ["/caisse", "/clients", "/prets", "/transactions"];
       if (!allowed.some(p => path === p || path.startsWith(p + "/"))) {
         router.replace("/caisse");
       }

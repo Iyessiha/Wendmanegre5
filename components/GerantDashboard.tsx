@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import TransactionsResume from "@/components/TransactionsResume";
 import {
   HandCoins, Wallet, Users, CheckCircle,
   AlertTriangle, Clock,
@@ -246,6 +247,10 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
           <span className="text-[12px] text-ink-400 self-center">— demandez au DG pour obtenir l'accès</span>
         </div>
       </Card>
+
+      <div className="mt-5">
+        <TransactionsResume />
+      </div>
     </div>
   );
 }

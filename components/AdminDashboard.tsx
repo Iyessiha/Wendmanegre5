@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import TransactionsResume from "@/components/TransactionsResume";
 import {
   HandCoins, Users, Wallet, TrendingUp,
   AlertTriangle, ArrowUpRight, ArrowDownRight, Building2, Shield,
@@ -159,6 +160,10 @@ export default function AdminDashboard() {
           ))}
         </div>
       </Card>
+
+      <div className="mt-5">
+        <TransactionsResume />
+      </div>
     </div>
   );
 }

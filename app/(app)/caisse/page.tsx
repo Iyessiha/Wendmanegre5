@@ -14,6 +14,7 @@ import {
 } from "@/lib/hooks2";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { KpiCard } from "@/components/KpiCard";
+import TransactionsResume from "@/components/TransactionsResume";
 import { formatXOF, formatDate } from "@/lib/format";
 import type { TypeTransaction } from "@/lib/database.types";
 
@@ -215,6 +216,10 @@ export default function CaissePage() {
           </div>
         )}
       </Card>
+
+      <div className="mt-5">
+        <TransactionsResume />
+      </div>
 
       {/* Modal transaction */}
       <Modal open={!!openTx} onClose={() => { setOpenTx(null); setErrorMsg(null); }} title={txDef?.label ?? ""}>

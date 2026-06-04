@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, HandCoins, Wallet,
-  Package, Settings, LogOut, Store, Calculator, UserCog, FileText, ClipboardList, ShieldCheck, Radio,
+  Package, Settings, LogOut, Store, Calculator, UserCog, FileText, ClipboardList, ShieldCheck, Radio, ArrowLeftRight,
 } from "lucide-react";
 import { ENTREPRISE } from "@/lib/data";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
@@ -13,6 +13,7 @@ import type { Profile } from "@/lib/database.types";
 
 const navAdmin = [
   { href: "/dashboard",    label: "Tableau de bord",  icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions",      icon: ArrowLeftRight  },
   { href: "/clients",      label: "Commerçants",       icon: Users           },
   { href: "/prets",        label: "Prêts & encours",   icon: HandCoins       },
   { href: "/caisses",      label: "Caisses",            icon: Wallet          },
@@ -28,6 +29,7 @@ const navAdmin = [
 
 const navCaissier = [
   { href: "/caisse",   label: "Mon espace",       icon: Store    },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/clients",  label: "Commerçants",      icon: Users    },
   { href: "/prets",    label: "Prêts & encours",  icon: HandCoins},
 ];

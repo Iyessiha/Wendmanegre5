@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Users, HandCoins, Wallet, Store, UserCog,
   MoreHorizontal, X, Package, Calculator, Settings,
-  LogOut, ChevronRight, FileText, ClipboardList, ShieldCheck, Radio,
+  LogOut, ChevronRight, FileText, ClipboardList, ShieldCheck, Radio, ArrowLeftRight,
 } from "lucide-react";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { clearDemoSession } from "@/lib/demo-session";
@@ -14,15 +14,16 @@ import type { Profile } from "@/lib/database.types";
 
 const primaryAdmin = [
   { href: "/dashboard",    label: "Accueil",     icon: LayoutDashboard },
+  { href: "/transactions", label: "Transac.",    icon: ArrowLeftRight  },
   { href: "/clients",      label: "Commerçants", icon: Users           },
-  { href: "/prets",        label: "Prêts",       icon: HandCoins       },
   { href: "/caisses",      label: "Caisses",     icon: Wallet          },
 ];
 
 const primaryCaissier = [
-  { href: "/caisse",   label: "Accueil",     icon: Store     },
-  { href: "/clients",  label: "Commerçants", icon: Users     },
-  { href: "/prets",    label: "Prêts",       icon: HandCoins },
+  { href: "/caisse",       label: "Accueil",     icon: Store          },
+  { href: "/transactions", label: "Transac.",    icon: ArrowLeftRight },
+  { href: "/clients",      label: "Commerçants", icon: Users          },
+  { href: "/prets",        label: "Prêts",       icon: HandCoins      },
 ];
 
 const drawerAdmin = [
