@@ -3,11 +3,12 @@
 import { useState } from "react";
 import {
   Building2, Users, Receipt, Percent, ShieldCheck,
-  Save, Plus, Trash2, Edit2, RotateCcw, Check
+  Save, Plus, Trash2, Edit2, RotateCcw, Check, UserPlus, KeyRound, Power
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PERMISSIONS_DEFS, type PermissionKey, GERANT_DEFAULTS } from "@/lib/permissions";
 import { useProfiles, updateProfile, useConfigFrais, saveConfigFrais, useConfigEntreprise, saveConfigEntreprise } from "@/lib/hooks2";
+import { creerUtilisateur, reinitialiserMdp, definirActif } from "@/lib/admin-users";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
 
@@ -49,6 +50,44 @@ export default function ParametresPage() {
   // Edit user
   const [editUser, setEditUser] = useState<any | null>(null);
   const [userForm, setUserForm] = useState<Record<string,string>>({});
+
+  // Gestion des comptes (admin) — création, réinitialisation, activation
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<Record<string,string>>({ identifiant: "", nom: "", role: "caissier", agence: "Yako Centre", password: "" });
+  const [resetUser, setResetUser] = useState<any | null>(null);
+  const [resetPwd, setResetPwd]   = useState("");
+  const [busy, setBusy]           = useState(false);
+  const [actErr, setActErr]       = useState<string | null>(null);
+
+  async function doCreate() {
+    setBusy(true); setActErr(null);
+    try {
+      await creerUtilisateur(createForm as any);
+      setCreateOpen(false);
+      setCreateForm({ identifiant: "", nom: "", role: "caissier", agence: "Yako Centre", password: "" });
+      refetchProfiles();
+    } catch (e: any) { setActErr(e?.message ?? "Erreur lors de la création."); }
+    setBusy(false);
+  }
+
+  async function doReset() {
+    if (!resetUser) return;
+    setBusy(true); setActErr(null);
+    try {
+      await reinitialiserMdp(resetUser.id, resetPwd);
+      setResetUser(null); setResetPwd("");
+    } catch (e: any) { setActErr(e?.message ?? "Erreur lors de la réinitialisation."); }
+    setBusy(false);
+  }
+
+  async function doToggle(u: any) {
+    const actif = !(u.actif ?? true);
+    if (!confirm(actif ? `Réactiver le compte de ${u.nom} ?` : `Désactiver le compte de ${u.nom} ? Il ne pourra plus se connecter.`)) return;
+    setBusy(true);
+    try { await definirActif(u.id, actif); refetchProfiles(); }
+    catch (e: any) { alert(e?.message ?? "Erreur."); }
+    setBusy(false);
+  }
 
   async function saveCfg() {
     setCfgSaving(true);
@@ -153,6 +192,11 @@ export default function ParametresPage() {
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between border-b border-sand-200 px-5 py-4">
               <h3 className="display text-lg font-bold text-ink">Utilisateurs & rôles</h3>
+              {profiles.length > 0 && (
+                <Btn onClick={() => { setActErr(null); setCreateOpen(true); }}>
+                  <UserPlus size={16} /> Nouvel utilisateur
+                </Btn>
+              )}
             </div>
             <div className="divide-y divide-sand-100">
               {displayUsers.map((u: any) => {
@@ -160,17 +204,31 @@ export default function ParametresPage() {
                 return (
                   <div key={u.id} className="flex items-center justify-between px-5 py-3.5">
                     <div>
-                      <div className="font-medium text-ink">{u.nom}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-ink">{u.nom}</span>
+                        {u.actif === false && <Badge className="bg-ember-100 text-ember-600 text-[10px]">désactivé</Badge>}
+                      </div>
+                      {u.identifiant && <div className="num text-[11px] text-ink-500">identifiant : {u.identifiant}</div>}
                       <div className="num text-[11px] text-ink-400">{u.telephone} · {u.agence}</div>
                       {caisse && <div className="text-[11px] text-ink-400">Caisse : {caisse.nom}</div>}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <Badge className={roleStyle[u.role] ?? "bg-sand-200 text-ink-700"}>{u.role}</Badge>
                       {profiles.length > 0 && (
-                        <button onClick={() => { setEditUser(u); setUserForm({ nom: u.nom, role: u.role, agence: u.agence, telephone: u.telephone ?? "" }); }}
-                          className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ink">
-                          <Edit2 size={15} />
-                        </button>
+                        <>
+                          <button title="Modifier" onClick={() => { setEditUser(u); setUserForm({ nom: u.nom, role: u.role, agence: u.agence, telephone: u.telephone ?? "" }); }}
+                            className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ink">
+                            <Edit2 size={15} />
+                          </button>
+                          <button title="Réinitialiser le mot de passe" onClick={() => { setActErr(null); setResetPwd(""); setResetUser(u); }}
+                            className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ink">
+                            <KeyRound size={15} />
+                          </button>
+                          <button title={u.actif === false ? "Réactiver" : "Désactiver"} onClick={() => doToggle(u)}
+                            className={`p-1.5 rounded-lg hover:bg-sand-200 ${u.actif === false ? "text-leaf" : "text-ink-400 hover:text-ember-600"}`}>
+                            <Power size={15} />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -300,6 +358,55 @@ export default function ParametresPage() {
         </div>
         <Field label="Téléphone"><input className={inputCls + " num"} value={userForm.telephone} onChange={e => setUserForm(f => ({ ...f, telephone: e.target.value }))} /></Field>
         <div className="mt-2 flex justify-end gap-2"><Btn variant="ghost" onClick={() => setEditUser(null)}>Annuler</Btn><Btn onClick={saveUser}>Enregistrer</Btn></div>
+      </Modal>
+
+      {/* Modal création utilisateur */}
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nouvel utilisateur">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Identifiant">
+            <input className={inputCls} placeholder="ex. issa" value={createForm.identifiant}
+              onChange={e => setCreateForm(f => ({ ...f, identifiant: e.target.value.toLowerCase().replace(/\s/g, "") }))} />
+          </Field>
+          <Field label="Nom complet">
+            <input className={inputCls} value={createForm.nom} onChange={e => setCreateForm(f => ({ ...f, nom: e.target.value }))} />
+          </Field>
+          <Field label="Rôle">
+            <select className={inputCls} value={createForm.role} onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))}>
+              <option value="caissier">Caissier</option>
+              <option value="gerant">Gérant</option>
+              <option value="admin">Administrateur</option>
+            </select>
+          </Field>
+          <Field label="Agence">
+            <input className={inputCls} value={createForm.agence} onChange={e => setCreateForm(f => ({ ...f, agence: e.target.value }))} />
+          </Field>
+        </div>
+        <Field label="Mot de passe initial">
+          <input className={inputCls} type="text" placeholder="au moins 6 caractères" value={createForm.password}
+            onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))} />
+        </Field>
+        <p className="text-[11px] text-ink-400">L'employé se connectera avec l'identifiant «&nbsp;{createForm.identifiant || "…"}&nbsp;» et ce mot de passe.</p>
+        {actErr && <p className="mt-2 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{actErr}</p>}
+        <div className="mt-3 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setCreateOpen(false)}>Annuler</Btn>
+          <Btn onClick={doCreate} className={busy ? "opacity-50" : ""}>{busy ? "Création…" : "Créer le compte"}</Btn>
+        </div>
+      </Modal>
+
+      {/* Modal réinitialisation mot de passe */}
+      <Modal open={!!resetUser} onClose={() => setResetUser(null)} title="Réinitialiser le mot de passe">
+        <p className="mb-3 text-[13px] text-ink-500">
+          Nouveau mot de passe pour <strong>{resetUser?.nom}</strong>
+          {resetUser?.identifiant ? ` (identifiant ${resetUser.identifiant})` : ""}.
+        </p>
+        <Field label="Nouveau mot de passe">
+          <input className={inputCls} type="text" placeholder="au moins 6 caractères" value={resetPwd} onChange={e => setResetPwd(e.target.value)} />
+        </Field>
+        {actErr && <p className="mt-2 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{actErr}</p>}
+        <div className="mt-3 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setResetUser(null)}>Annuler</Btn>
+          <Btn onClick={doReset} className={busy ? "opacity-50" : ""}>{busy ? "…" : "Réinitialiser"}</Btn>
+        </div>
       </Modal>
 
       {/* Modal edit frais */}

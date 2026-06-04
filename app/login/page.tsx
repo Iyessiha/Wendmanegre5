@@ -3,9 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ShieldCheck, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, ShieldCheck, Eye, EyeOff, User, Lock } from "lucide-react";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { setDemoSession, DEMO_PROFILES } from "@/lib/demo-session";
+
+// Domaine interne ajouté automatiquement derrière l'identifiant.
+// L'employé ne voit jamais d'e-mail : il tape "boukary", l'app utilise
+// "boukary@wendmanegre.com" pour parler à Supabase.
+const AUTH_DOMAINE = "wendmanegre.com";
+
+function versEmail(identifiant: string): string {
+  const v = identifiant.trim().toLowerCase();
+  return v.includes("@") ? v : `${v}@${AUTH_DOMAINE}`;
+}
 
 const roleChip: Record<string, string> = {
   admin:    "bg-clay-100 text-clay-700",
@@ -18,25 +28,28 @@ const roleLabel: Record<string, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [showPwd, setShowPwd]   = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [identifiant, setIdentifiant] = useState("");
+  const [password, setPassword]       = useState("");
+  const [showPwd, setShowPwd]         = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
 
-  async function connecter(emailArg?: string, pwdArg?: string) {
-    const mail = (emailArg ?? email).trim().toLowerCase();
-    const pwd  = pwdArg ?? password;
+  async function connecter(idArg?: string, pwdArg?: string) {
+    const id  = (idArg ?? identifiant).trim();
+    const pwd = pwdArg ?? password;
 
-    if (!mail) { setError("Saisissez votre adresse e-mail."); return; }
+    if (!id)  { setError("Saisissez votre identifiant."); return; }
+    if (!pwd) { setError("Saisissez votre mot de passe."); return; }
     setLoading(true);
     setError(null);
+
+    const mail = versEmail(id);
 
     // ── Mode démo : aucun backend requis ──────────────────
     if (!SUPABASE_CONFIGURED) {
       const profile = setDemoSession(mail);
       if (!profile) {
-        setError("Compte de démonstration inconnu.");
+        setError("Identifiant de démonstration inconnu.");
         setLoading(false);
         return;
       }
@@ -46,14 +59,11 @@ export default function LoginPage() {
 
     // ── Mode Supabase (production) ────────────────────────
     const sb = getClient();
-    const { data, error: authErr } = await sb.auth.signInWithPassword({
-      email: mail,
-      password: pwd || "demo1234",
-    });
+    const { data, error: authErr } = await sb.auth.signInWithPassword({ email: mail, password: pwd });
 
     if (authErr) {
       setError(authErr.message === "Invalid login credentials"
-        ? "E-mail ou mot de passe incorrect."
+        ? "Identifiant ou mot de passe incorrect."
         : authErr.message);
       setLoading(false);
       return;
@@ -64,11 +74,12 @@ export default function LoginPage() {
     router.push(role === "caissier" ? "/caisse" : "/dashboard");
   }
 
-  function remplirDemo(mail: string) {
-    setEmail(mail);
+  function remplirDemo(mailKey: string) {
+    const id = mailKey.split("@")[0];
+    setIdentifiant(id);
     setPassword("demo1234");
     setError(null);
-    connecter(mail, "demo1234");
+    connecter(id, "demo1234");
   }
 
   return (
@@ -100,16 +111,16 @@ export default function LoginPage() {
             <h2 className="display mb-1 text-2xl font-bold text-ink">Connexion</h2>
             <p className="mb-6 text-[13px] text-ink-500">Accédez à votre tableau de bord.</p>
 
-            {/* E-mail */}
+            {/* Identifiant */}
             <label className="mb-4 block">
-              <span className="mb-1.5 block text-[13px] font-medium text-ink-700">Adresse e-mail</span>
+              <span className="mb-1.5 block text-[13px] font-medium text-ink-700">Identifiant</span>
               <div className="relative">
-                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
                 <input
-                  type="email" value={email} autoComplete="email"
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text" value={identifiant} autoComplete="username" autoCapitalize="none" spellCheck={false}
+                  onChange={(e) => setIdentifiant(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && connecter()}
-                  placeholder="nom@wendmanegre.com"
+                  placeholder="ex. boukary"
                   className="w-full rounded-xl border border-sand-300 bg-white py-2.5 pl-10 pr-3.5 text-sm outline-none transition-all focus:border-clay focus:ring-2 focus:ring-clay/15"
                 />
               </div>
@@ -134,12 +145,6 @@ export default function LoginPage() {
               </div>
             </label>
 
-            <div className="-mt-2 mb-5 text-right">
-              <Link href="/mot-de-passe" className="text-[12px] font-medium text-clay transition-colors hover:text-clay-600">
-                Mot de passe oublié ?
-              </Link>
-            </div>
-
             {error && (
               <p className="mb-4 rounded-xl bg-ember-100 px-3.5 py-2.5 text-[13px] text-ember-600">{error}</p>
             )}
@@ -148,6 +153,10 @@ export default function LoginPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-clay px-4 py-3 text-sm font-semibold text-sand-50 transition-all hover:bg-clay-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40">
               {loading ? "Connexion…" : (<>Se connecter <ArrowRight size={16} /></>)}
             </button>
+
+            <p className="mt-4 text-center text-[12px] text-ink-400">
+              Mot de passe oublié ? Contactez votre administrateur.
+            </p>
 
             {/* Accès démonstration — uniquement hors production */}
             {!SUPABASE_CONFIGURED && (
@@ -158,10 +167,13 @@ export default function LoginPage() {
                   <div className="h-px flex-1 bg-sand-200" />
                 </div>
                 <div className="grid gap-2">
-                  {Object.entries(DEMO_PROFILES).map(([mail, p]) => (
-                    <button key={mail} onClick={() => remplirDemo(mail)}
+                  {Object.entries(DEMO_PROFILES).map(([mailKey, p]) => (
+                    <button key={mailKey} onClick={() => remplirDemo(mailKey)}
                       className="flex items-center justify-between rounded-xl border border-sand-200 px-3.5 py-2.5 text-left transition-all hover:border-sand-300 hover:bg-sand-100">
-                      <span className="text-sm font-medium text-ink">{p.nom}</span>
+                      <span>
+                        <span className="block text-sm font-medium text-ink">{p.nom}</span>
+                        <span className="block text-[11px] text-ink-400">identifiant : {mailKey.split("@")[0]}</span>
+                      </span>
                       <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${roleChip[p.role]}`}>
                         {roleLabel[p.role]}
                       </span>
