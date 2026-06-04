@@ -19,14 +19,14 @@ const STATUT: Record<StatutDoc, { label: string; cls: string }> = {
   annulee:   { label: "Annulée",   cls: "bg-ember-100 text-ember-600" },
 };
 const FILTRES = [
-  { v: "tous", l: "Tous" }, { v: "brouillon", l: "Brouillons" },
+  { v: "tous", l: "Tous" }, { v: "impayes", l: "Impayées" }, { v: "brouillon", l: "Brouillons" },
   { v: "validee", l: "Validées" }, { v: "payee", l: "Payées" }, { v: "annulee", l: "Annulées" },
 ];
 
-export default function FacturationModule({ docType }: { docType: TypeDoc }) {
+export default function FacturationModule({ docType, embedded = false }: { docType: TypeDoc; embedded?: boolean }) {
   const type = docType;
   const [statut, setStatut] = useState("tous");
-  const { data: factures, refetch } = useFactures({ type, statut });
+  const { data: factures, refetch } = useFactures({ type, statut: statut === "impayes" ? "tous" : statut });
   const { data: clients } = useClients();
   const { data: caisses } = useCaisses();
   const [q, setQ] = useState("");
@@ -72,11 +72,19 @@ export default function FacturationModule({ docType }: { docType: TypeDoc }) {
   const setLigne = (i: number, patch: Partial<{ designation: string; quantite: string; prix_unitaire: string }>) =>
     setForm(f => ({ ...f, lignes: f.lignes.map((l, idx) => idx === i ? { ...l, ...patch } : l) }));
 
-  const rows = useMemo(() => factures.filter(f =>
-    (f.client_nom ?? "").toLowerCase().includes(q.toLowerCase()) || f.id.toLowerCase().includes(q.toLowerCase())
-  ), [factures, q]);
+  const rows = useMemo(() => factures.filter(f => {
+    const matchQ = (f.client_nom ?? "").toLowerCase().includes(q.toLowerCase()) || f.id.toLowerCase().includes(q.toLowerCase());
+    if (!matchQ) return false;
+    if (statut === "impayes") return f.statut !== "annulee" && Number(f.reste_a_payer ?? 0) > 0;
+    return true;
+  }), [factures, q, statut]);
 
   const totalAffiche = rows.filter(f => f.statut !== "annulee").reduce((s, f) => s + f.montant_total, 0);
+  const resteImpaye = rows.filter(f => f.statut !== "annulee").reduce((s, f) => s + Number(f.reste_a_payer ?? 0), 0);
+  const _mot = type === "facture" ? "facture" : "commande";
+  const sousTitre = resteImpaye > 0
+    ? `${rows.length} ${_mot}s · reste impayé ${formatXOF(resteImpaye)}`
+    : `${rows.length} ${_mot}s · ${formatXOF(totalAffiche)}`;
 
   function ouvrir() {
     setErreur(null);
@@ -112,12 +120,19 @@ export default function FacturationModule({ docType }: { docType: TypeDoc }) {
   const motDoc = type === "facture" ? "facture" : "commande";
 
   return (
-    <div className="animate-fade-up">
-      <PageHeader
-        title={docType === "facture" ? "Facturation" : "Commandes clients"}
-        subtitle={`${rows.length} ${motDoc}s · ${formatXOF(totalAffiche)}`}
-        action={<Btn onClick={ouvrir}><Plus size={16} /> <span className="hidden sm:inline">Nouvelle {motDoc}</span></Btn>}
-      />
+    <div className={embedded ? "" : "animate-fade-up"}>
+      {embedded ? (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="text-[13px] text-ink-500">{sousTitre}</div>
+          <Btn onClick={ouvrir}><Plus size={16} /> Nouvelle {motDoc}</Btn>
+        </div>
+      ) : (
+        <PageHeader
+          title={docType === "facture" ? "Facturation" : "Commandes clients"}
+          subtitle={sousTitre}
+          action={<Btn onClick={ouvrir}><Plus size={16} /> <span className="hidden sm:inline">Nouvelle {motDoc}</span></Btn>}
+        />
+      )}
 
       <div className="mb-3 flex items-center gap-2 rounded-xl border border-sand-200 bg-white/70 px-3.5 py-2.5 shadow-card">
         <Search size={17} className="text-ink-400 flex-shrink-0" />

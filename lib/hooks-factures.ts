@@ -199,3 +199,41 @@ export function useHistoriqueClient(clientId?: string) {
   useEffect(() => { refetch(); }, [refetch]);
   return { data, loading, refetch };
 }
+
+// ── Indicateur d'impayés + classement des commerçants endettés ──
+export interface ImpayesResume {
+  totalReste: number;
+  nbFactures: number;
+  nbCommercants: number;
+  top: { client_id: string; nom: string; reste: number; nb: number }[];
+}
+
+export function useImpayes() {
+  const [data, setData] = useState<ImpayesResume>({ totalReste: 0, nbFactures: 0, nbCommercants: 0, top: [] });
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: rows } = await (getClient() as any)
+        .from("v_factures")
+        .select("client_id, client_nom, reste_a_payer, statut")
+        .neq("statut", "annulee")
+        .gt("reste_a_payer", 0);
+      const list = rows ?? [];
+      const parClient = new Map<string, { client_id: string; nom: string; reste: number; nb: number }>();
+      let totalReste = 0;
+      for (const f of list) {
+        const reste = Number(f.reste_a_payer ?? 0);
+        totalReste += reste;
+        const cur = parClient.get(f.client_id) ?? { client_id: f.client_id, nom: f.client_nom ?? f.client_id, reste: 0, nb: 0 };
+        cur.reste += reste; cur.nb += 1;
+        parClient.set(f.client_id, cur);
+      }
+      const top = Array.from(parClient.values()).sort((a, b) => b.reste - a.reste);
+      setData({ totalReste, nbFactures: list.length, nbCommercants: parClient.size, top });
+    } catch { setData({ totalReste: 0, nbFactures: 0, nbCommercants: 0, top: [] }); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
+}

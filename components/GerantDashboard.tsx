@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import TransactionsResume from "@/components/TransactionsResume";
+import FacturesImpayes from "@/components/FacturesImpayes";
 import {
   HandCoins, Wallet, Users, CheckCircle,
   AlertTriangle, Clock,
@@ -248,8 +249,9 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
         </div>
       </Card>
 
-      <div className="mt-5">
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <TransactionsResume />
+        <FacturesImpayes />
       </div>
     </div>
   );

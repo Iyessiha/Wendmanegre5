@@ -5,7 +5,7 @@ import {
   Package, Warehouse, Truck, History, ClipboardList,
   BarChart2, Plus, Search, Edit2, Printer, ShoppingCart,
   ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle,
-  Check, X, ChevronDown, Filter, Trash2, Image as ImageIcon,
+  Check, X, ChevronDown, Filter, Trash2, Image as ImageIcon, FileText,
 } from "lucide-react";
 import {
   useProduits, useFournisseurs, useCommandes, useMouvements, useVentes,
@@ -16,6 +16,7 @@ import {
 } from "@/lib/hooks-stock";
 import { useProfiles } from "@/lib/hooks2";
 import { PhotoProfil } from "@/components/FicheMedia";
+import FacturationModule from "@/components/FacturationModule";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
 import {
@@ -29,7 +30,8 @@ const TABS = [
   { id: "catalogue",        label: "Catalogue",       icon: Package     },
   { id: "entrepots",        label: "Entrepôts",       icon: Warehouse   },
   { id: "fournisseurs",     label: "Fournisseurs",    icon: Truck       },
-  { id: "commandes",        label: "Commandes",       icon: ClipboardList},
+  { id: "commandes",        label: "Cmd. fournisseurs", icon: ClipboardList},
+  { id: "commandes_clients", label: "Cmd. clients",     icon: FileText    },
   { id: "mouvements",       label: "Mouvements",      icon: History     },
   { id: "ventes",           label: "Ventes POS",      icon: ShoppingCart},
   { id: "analyses",         label: "Analyses",        icon: BarChart2   },
@@ -283,6 +285,11 @@ export default function BoutiquePage() {
           </button>
         ))}
       </div>
+
+      {/* ── COMMANDES CLIENTS ── */}
+      {tab === "commandes_clients" && (
+        <FacturationModule docType="commande" embedded />
+      )}
 
       {/* ── CATALOGUE ── */}
       {tab === "catalogue" && (

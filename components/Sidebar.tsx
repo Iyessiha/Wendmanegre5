@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, HandCoins, Wallet,
-  Package, Settings, LogOut, Store, Calculator, UserCog, FileText, ClipboardList, ShieldCheck, Radio, ArrowLeftRight,
+  Package, Settings, LogOut, Store, Calculator, UserCog, FileText, ShieldCheck, Radio, ArrowLeftRight,
 } from "lucide-react";
 import { ENTREPRISE } from "@/lib/data";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
@@ -20,7 +20,6 @@ const navAdmin = [
   { href: "/operateurs",   label: "Opérateurs",         icon: Radio           },
   { href: "/boutique",     label: "Boutique & stock",   icon: Package         },
   { href: "/facturation",  label: "Facturation",        icon: FileText        },
-  { href: "/commandes",    label: "Commandes",          icon: ClipboardList   },
   { href: "/comptabilite", label: "Comptabilité",       icon: Calculator      },
   { href: "/grh",          label: "Ressources humaines",icon: UserCog         },
   { href: "/utilisateurs", label: "Utilisateurs",       icon: ShieldCheck     },

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Users, HandCoins, Wallet, Store, UserCog,
   MoreHorizontal, X, Package, Calculator, Settings,
-  LogOut, ChevronRight, FileText, ClipboardList, ShieldCheck, Radio, ArrowLeftRight,
+  LogOut, ChevronRight, FileText, ShieldCheck, Radio, ArrowLeftRight,
 } from "lucide-react";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { clearDemoSession } from "@/lib/demo-session";
@@ -30,7 +30,6 @@ const drawerAdmin = [
   { href: "/boutique",     label: "Boutique & stock",  icon: Package    },
   { href: "/operateurs",   label: "Opérateurs",         icon: Radio      },
   { href: "/facturation",  label: "Facturation",        icon: FileText   },
-  { href: "/commandes",    label: "Commandes",          icon: ClipboardList },
   { href: "/comptabilite", label: "Comptabilité",       icon: Calculator },
   { href: "/parametres",   label: "Paramètres",         icon: Settings   },
   { href: "/grh",          label: "Ressources humaines", icon: UserCog    },

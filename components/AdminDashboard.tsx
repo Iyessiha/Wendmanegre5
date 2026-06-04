@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import TransactionsResume from "@/components/TransactionsResume";
+import FacturesImpayes from "@/components/FacturesImpayes";
 import {
   HandCoins, Users, Wallet, TrendingUp,
   AlertTriangle, ArrowUpRight, ArrowDownRight, Building2, Shield,
@@ -161,8 +162,9 @@ export default function AdminDashboard() {
         </div>
       </Card>
 
-      <div className="mt-5">
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <TransactionsResume />
+        <FacturesImpayes />
       </div>
     </div>
   );
