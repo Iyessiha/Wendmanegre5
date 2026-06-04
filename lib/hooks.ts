@@ -289,6 +289,9 @@ export interface DashboardStats {
   encoursPrets:      number;
   encoursFactures:   number;
   tresorerie:        number;
+  tresorerieBanque:  number;
+  tresorerieEspeces: number;
+  flotteMobile:      number;
   nbCommerçants:     number;
   nbImpayes:         number;
   nbImpayesPrets:    number;
@@ -306,7 +309,8 @@ export interface DashboardStats {
 export function useDashboardStats(): { stats: DashboardStats; loading: boolean } {
   const [stats, setStats] = useState<DashboardStats>({
     encours: 0, encoursPrets: 0, encoursFactures: 0,
-    tresorerie: 0, nbCommerçants: 0, nbImpayes: 0, nbImpayesPrets: 0, nbImpayesFactures: 0,
+    tresorerie: 0, tresorerieBanque: 0, tresorerieEspeces: 0, flotteMobile: 0,
+    nbCommerçants: 0, nbImpayes: 0, nbImpayesPrets: 0, nbImpayesFactures: 0,
     tauxRecouvrement: 0, enRetard: [], parVille: [], parType: [], activiteRecente: [],
   });
   const [loading, setLoading] = useState(true);
@@ -314,18 +318,25 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean }
   useEffect(() => {
     async function load() {
       const sb = getClient() as any;
-      const [pretsRes, caissesRes, clientsRes, rembRes, facturesRes] = await Promise.all([
+      const [pretsRes, caissesRes, clientsRes, rembRes, facturesRes, comptesRes] = await Promise.all([
         sb.from("v_prets_encours").select("*"),
         sb.from("caisses").select("solde").eq("actif", true),
         sb.from("clients").select("*", { count: "exact", head: true }).eq("actif", true),
         sb.from("remboursements").select("montant,pret_id,date_remb,prets(client_id,clients(nom))").order("date_remb", { ascending: false }).limit(6),
         sb.from("v_factures").select("client_ville,reste_a_payer,montant_total,total_paye,statut").neq("statut","annulee"),
+        sb.from("comptes_bancaires").select("type,solde_dolibarr,actif").eq("actif", true),
       ]);
 
       const prets: PretEncours[] = (pretsRes.data ?? []) as PretEncours[];
       const actifs = prets.filter(p => p.statut !== "rembourse" && p.statut !== "annule");
       const encoursPrets = actifs.reduce((s, p) => s + (p.reste_a_payer ?? 0), 0);
       const tresorerie = (caissesRes.data ?? []).reduce((s: number, c: any) => s + c.solde, 0);
+
+      // Trésorerie Dolibarr par type
+      const comptes = (comptesRes.data ?? []) as any[];
+      const tresorerieBanque  = comptes.filter(c=>c.type==="banque").reduce((s:number,c:any)=>s+Number(c.solde_dolibarr),0);
+      const tresorerieEspeces = comptes.filter(c=>c.type==="caisse_especes").reduce((s:number,c:any)=>s+Number(c.solde_dolibarr),0);
+      const flotteMobile      = comptes.filter(c=>c.type==="mobile_money").reduce((s:number,c:any)=>s+Number(c.solde_dolibarr),0);
       const totalOctroye = prets.reduce((s, p) => s + p.montant, 0);
       const totalRemb = prets.reduce((s, p) => s + p.total_rembourse, 0);
       const enRetard = actifs.filter(p => p.jours_retard > 0).slice(0, 5);
@@ -362,7 +373,7 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean }
 
       setStats({
         encours, encoursPrets, encoursFactures,
-        tresorerie,
+        tresorerie, tresorerieBanque, tresorerieEspeces, flotteMobile,
         nbCommerçants: clientsRes.count ?? 0,
         nbImpayes: actifs.length + facturesImp.length,
         nbImpayesPrets: actifs.length,

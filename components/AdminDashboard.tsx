@@ -5,7 +5,7 @@ import Link from "next/link";
 import TransactionsResume from "@/components/TransactionsResume";
 import FacturesImpayes from "@/components/FacturesImpayes";
 import {
-  HandCoins, Users, Wallet, TrendingUp,
+  HandCoins, Users, Wallet, TrendingUp, Smartphone,
   AlertTriangle, ArrowUpRight, ArrowDownRight, Building2, Shield,
 } from "lucide-react";
 import {
@@ -47,8 +47,8 @@ export default function AdminDashboard() {
           sub={`prêts ${formatXOFCompact(stats.encoursPrets)} · fac. ${formatXOFCompact(stats.encoursFactures)}`}
           icon={<HandCoins size={18}/>} accent="clay" />
         <KpiCard label="Trésorerie totale"
-          value={formatXOF(stats.tresorerie)}
-          sub={`${caisses.length} caisses`}
+          value={formatXOF(stats.tresorerieBanque + stats.tresorerieEspeces)}
+          sub={`banques ${formatXOFCompact(stats.tresorerieBanque)} · espèces ${formatXOFCompact(stats.tresorerieEspeces)}`}
           icon={<Wallet size={18}/>} accent="leaf" />
         <KpiCard label="Commerçants réseau"
           value={String(stats.nbCommerçants)}
@@ -59,6 +59,18 @@ export default function AdminDashboard() {
           sub="prêts & factures combinés"
           icon={<TrendingUp size={18}/>} accent="gold" />
       </div>
+
+      {/* Flotte Orange Money */}
+      {stats.flotteMobile > 0 && (
+        <Link href="/comptes" className="mt-3 flex items-center justify-between rounded-xl bg-orange-50 border border-orange-200 px-4 py-2.5 text-[13px] hover:bg-orange-100">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-100 text-orange-600"><Smartphone size={14}/></span>
+            <span className="font-medium text-orange-800">Flotte Orange Money</span>
+            <span className="num font-bold text-orange-700">{formatXOF(stats.flotteMobile)}</span>
+          </div>
+          <span className="text-orange-500">Voir tous les comptes →</span>
+        </Link>
+      )}
 
       {/* Graphiques */}
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
