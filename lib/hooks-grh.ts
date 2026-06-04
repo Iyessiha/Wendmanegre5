@@ -195,14 +195,48 @@ export function useEmployes() {
 
 export function useConges() {
   const [data, setData] = useState<Conge[]>(CONGES_DEMO);
-  const [loading, setLoading] = useState(false);
-  return { data, loading };
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    try {
+      const { data: rows, error } = await (getClient() as any)
+        .from("conges").select("*, profile:profiles(nom)").order("created_at", { ascending: false });
+      if (error) throw error;
+      setData((rows ?? []).map((c: any) => ({ ...c, employe_nom: c.profile?.nom ?? "" })));
+    } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
 }
 
-export function usePresencesSemaine(semaine: string) {
-  const [data, setData] = useState<Presence[]>(PRESENCES_DEMO);
-  const [loading, setLoading] = useState(false);
-  return { data, loading };
+export function usePresencesSemaine(dates: string[]) {
+  const [data, setData] = useState<Presence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const debut = dates[0]; const fin = dates[dates.length - 1];
+  const refetch = useCallback(async () => {
+    if (!debut || !fin) { setLoading(false); return; }
+    try {
+      const { data: rows, error } = await (getClient() as any)
+        .from("presences").select("*").gte("date_presence", debut).lte("date_presence", fin);
+      if (error) throw error;
+      setData(rows ?? []);
+    } catch {}
+    setLoading(false);
+  }, [debut, fin]);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
+}
+
+export async function creerConge(input: {
+  employe_id: string; type: string; date_debut: string; date_fin: string; motif?: string;
+}): Promise<void> {
+  const d1 = new Date(input.date_debut); const d2 = new Date(input.date_fin);
+  const nb_jours = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1);
+  const { error } = await (getClient() as any).from("conges").insert({
+    employe_id: input.employe_id, type: input.type, date_debut: input.date_debut,
+    date_fin: input.date_fin, nb_jours, motif: input.motif || null, statut: "en_attente",
+  });
+  if (error) throw error;
 }
 
 export async function sauvegarderPresence(p: Omit<Presence, "id">) {

@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import {
   useProduits, useFournisseurs, useCommandes, useMouvements, useVentes,
-  creerVente, ajusterStock,
+  creerVente, ajusterStock, creerProduit,
+  creerCommande, changerStatutCommande, recevoirCommande,
   type Produit, type CommandeFournisseur,
 } from "@/lib/hooks-stock";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
@@ -62,9 +63,9 @@ export default function BoutiquePage() {
   const [tab, setTab] = useState("catalogue");
   const { data: produits, refetch: refetchProduits } = useProduits();
   const { data: fournisseurs } = useFournisseurs();
-  const { data: commandes } = useCommandes();
-  const { data: mouvements } = useMouvements();
-  const { data: ventes } = useVentes();
+  const { data: commandes, refetch: refetchCommandes } = useCommandes();
+  const { data: mouvements, refetch: refetchMouvements } = useMouvements();
+  const { data: ventes, refetch: refetchVentes } = useVentes();
 
   // Filtres catalogue
   const [q, setQ] = useState("");
@@ -140,6 +141,8 @@ export default function BoutiquePage() {
     });
     setOpenVente(null);
     refetchProduits();
+    refetchVentes();
+    refetchMouvements();
   }
 
   async function submitAjustement() {
@@ -148,6 +151,71 @@ export default function BoutiquePage() {
     await ajusterStock(openAjustement.id, q, ajustForm.motif);
     setOpenAjustement(null);
     refetchProduits();
+    refetchMouvements();
+  }
+
+  const [prodSaving, setProdSaving] = useState(false);
+  const [prodErr, setProdErr] = useState<string | null>(null);
+  async function submitProduit() {
+    if (!prodForm.nom || !prodForm.prix_unitaire) { setProdErr("Nom et prix de vente requis."); return; }
+    setProdSaving(true); setProdErr(null);
+    try {
+      await creerProduit({
+        nom: prodForm.nom, categorie: prodForm.categorie, code_barre: prodForm.code_barre || undefined,
+        prix_unitaire: Number(prodForm.prix_unitaire), prix_achat: Number(prodForm.prix_achat) || 0,
+        stock: Number(prodForm.stock) || 0, seuil_alerte: Number(prodForm.seuil_alerte) || 10,
+        entrepot: prodForm.entrepot, fournisseur_id: prodForm.fournisseur_id || undefined,
+        notes: prodForm.notes || undefined,
+      });
+      setProdForm({ nom: "", categorie: "SIM", code_barre: "", prix_unitaire: "", prix_achat: "", stock: "", seuil_alerte: "10", entrepot: "Yako Centre", fournisseur_id: "", notes: "" });
+      setOpenNouveauProduit(false);
+      refetchProduits();
+    } catch (e: any) { setProdErr(e?.message ?? "Erreur lors de la création."); }
+    setProdSaving(false);
+  }
+
+  // ── Commandes fournisseurs ──
+  const [cmdForm, setCmdForm] = useState<{ fournisseur_id: string; date_livraison_prevue: string; notes: string; lignes: { produit_id: string; quantite: string; prix_unitaire: string }[] }>(
+    { fournisseur_id: "", date_livraison_prevue: "", notes: "", lignes: [{ produit_id: "", quantite: "1", prix_unitaire: "" }] }
+  );
+  const [cmdBusy, setCmdBusy] = useState(false);
+  const [cmdErr, setCmdErr] = useState<string | null>(null);
+
+  function setLigne(i: number, patch: Partial<{ produit_id: string; quantite: string; prix_unitaire: string }>) {
+    setCmdForm(f => ({ ...f, lignes: f.lignes.map((l, idx) => idx === i ? { ...l, ...patch } : l) }));
+  }
+  function choisirProduitLigne(i: number, produit_id: string) {
+    const p = produits.find(x => x.id === produit_id);
+    setLigne(i, { produit_id, prix_unitaire: p ? String(p.prix_achat || p.prix_unitaire) : "" });
+  }
+  const cmdTotal = cmdForm.lignes.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
+
+  async function submitCommande() {
+    if (!cmdForm.fournisseur_id) { setCmdErr("Choisissez un fournisseur."); return; }
+    const lignes = cmdForm.lignes
+      .filter(l => l.produit_id && Number(l.quantite) > 0)
+      .map(l => {
+        const p = produits.find(x => x.id === l.produit_id);
+        return { produit_id: l.produit_id, description: p?.nom ?? "", quantite: Number(l.quantite), prix_unitaire: Number(l.prix_unitaire) || 0 };
+      });
+    if (lignes.length === 0) { setCmdErr("Ajoutez au moins une ligne avec un produit."); return; }
+    setCmdBusy(true); setCmdErr(null);
+    try {
+      await creerCommande({ fournisseur_id: cmdForm.fournisseur_id, date_livraison_prevue: cmdForm.date_livraison_prevue || undefined, notes: cmdForm.notes || undefined, lignes });
+      setCmdForm({ fournisseur_id: "", date_livraison_prevue: "", notes: "", lignes: [{ produit_id: "", quantite: "1", prix_unitaire: "" }] });
+      setOpenNouvelleCommande(false);
+      refetchCommandes();
+    } catch (e: any) { setCmdErr(e?.message ?? "Erreur lors de la création de la commande."); }
+    setCmdBusy(false);
+  }
+
+  async function validerCommande(id: string) {
+    try { await changerStatutCommande(id, "validee"); refetchCommandes(); } catch (e: any) { alert(e?.message ?? "Erreur."); }
+  }
+  async function receptionnerCommande(cmd: CommandeFournisseur) {
+    if (!confirm(`Réceptionner la commande de ${cmd.fournisseur_nom} ? Le stock sera mis à jour.`)) return;
+    try { await recevoirCommande(cmd); refetchCommandes(); refetchProduits(); refetchMouvements(); }
+    catch (e: any) { alert(e?.message ?? "Erreur lors de la réception."); }
   }
 
   // ── Render ─────────────────────────────────────────────
@@ -420,10 +488,10 @@ export default function BoutiquePage() {
                         <div className="num text-lg font-semibold text-ink">{formatXOF(cmd.montant_total)}</div>
                         <div className="flex gap-1.5 mt-1 justify-end">
                           {cmd.statut === "brouillon" && (
-                            <button className="rounded-lg bg-clay text-sand-50 px-2.5 py-1 text-[12px] font-medium hover:bg-clay-600">✓ Valider</button>
+                            <button onClick={() => validerCommande(cmd.id)} className="rounded-lg bg-clay text-sand-50 px-2.5 py-1 text-[12px] font-medium hover:bg-clay-600">✓ Valider</button>
                           )}
                           {cmd.statut === "validee" && (
-                            <button className="rounded-lg bg-leaf-100 text-leaf-600 px-2.5 py-1 text-[12px] font-medium hover:bg-leaf-100/70">📦 Réceptionner</button>
+                            <button onClick={() => receptionnerCommande(cmd)} className="rounded-lg bg-leaf-100 text-leaf-600 px-2.5 py-1 text-[12px] font-medium hover:bg-leaf-100/70">📦 Réceptionner</button>
                           )}
                           <button onClick={() => setOpenCommande(cmd)}
                             className="rounded-lg bg-sand-200 text-ink-600 px-2.5 py-1 text-[12px] hover:bg-sand-300">Détail</button>
@@ -758,9 +826,58 @@ export default function BoutiquePage() {
           </select>
         </Field>
         <Field label="Notes (optionnel)"><input className={inputCls} value={prodForm.notes} onChange={e => setProdForm(f=>({...f,notes:e.target.value}))} /></Field>
+        {prodErr && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{prodErr}</p>}
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpenNouveauProduit(false)}>Annuler</Btn>
-          <Btn onClick={() => setOpenNouveauProduit(false)}>Créer le produit</Btn>
+          <Btn onClick={submitProduit} className={prodSaving ? "opacity-50" : ""}>{prodSaving ? "Création…" : "Créer le produit"}</Btn>
+        </div>
+      </Modal>
+
+      {/* ── Modal nouvelle commande ── */}
+      <Modal open={openNouvelleCommande} onClose={() => setOpenNouvelleCommande(false)} title="Nouvelle commande fournisseur">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Fournisseur">
+            <select className={inputCls} value={cmdForm.fournisseur_id} onChange={e => setCmdForm(f => ({ ...f, fournisseur_id: e.target.value }))}>
+              <option value="">— Choisir —</option>
+              {fournisseurs.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
+            </select>
+          </Field>
+          <Field label="Livraison prévue">
+            <input className={inputCls} type="date" value={cmdForm.date_livraison_prevue} onChange={e => setCmdForm(f => ({ ...f, date_livraison_prevue: e.target.value }))} />
+          </Field>
+        </div>
+
+        <div className="mt-2 mb-1 text-[12px] font-medium text-ink-600">Lignes de commande</div>
+        <div className="space-y-2">
+          {cmdForm.lignes.map((l, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-center">
+              <select className={inputCls + " col-span-6"} value={l.produit_id} onChange={e => choisirProduitLigne(i, e.target.value)}>
+                <option value="">— Produit —</option>
+                {produits.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
+              </select>
+              <input className={inputCls + " num col-span-2"} type="number" value={l.quantite} onChange={e => setLigne(i, { quantite: e.target.value })} placeholder="Qté" />
+              <input className={inputCls + " num col-span-3"} type="number" value={l.prix_unitaire} onChange={e => setLigne(i, { prix_unitaire: e.target.value })} placeholder="P.U." />
+              <button onClick={() => setCmdForm(f => ({ ...f, lignes: f.lignes.filter((_, idx) => idx !== i) }))}
+                className="col-span-1 flex items-center justify-center rounded-lg text-ink-400 hover:text-ember-600" disabled={cmdForm.lignes.length === 1}>
+                <X size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setCmdForm(f => ({ ...f, lignes: [...f.lignes, { produit_id: "", quantite: "1", prix_unitaire: "" }] }))}
+          className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-clay hover:underline">
+          <Plus size={14} /> Ajouter une ligne
+        </button>
+
+        <div className="mt-3 flex items-center justify-between border-t border-sand-200 pt-3">
+          <span className="text-[13px] text-ink-500">Total commande</span>
+          <span className="num text-lg font-semibold text-ink">{formatXOF(cmdTotal)}</span>
+        </div>
+
+        {cmdErr && <p className="mt-2 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{cmdErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setOpenNouvelleCommande(false)}>Annuler</Btn>
+          <Btn onClick={submitCommande} className={cmdBusy ? "opacity-50" : ""}>{cmdBusy ? "Création…" : "Créer la commande"}</Btn>
         </div>
       </Modal>
     </div>

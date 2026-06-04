@@ -4,40 +4,50 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   HandCoins, Wallet, Users, CheckCircle,
-  AlertTriangle, ArrowDownRight, Clock,
+  AlertTriangle, Clock,
   Store, Plane, ShieldCheck, Lock,
 } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { usePrets, useCaisses, useClients } from "@/lib/hooks";
+import { useProfiles } from "@/lib/hooks2";
 import { usePermissions } from "@/lib/permissions";
-import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
+import { PageHeader, Card, Badge } from "@/components/ui";
 import { KpiCard } from "@/components/KpiCard";
-import { formatXOF, formatDate, resteAPayer, joursDeRetard, statutLabel } from "@/lib/format";
+import { formatXOF, formatDate, statutLabel } from "@/lib/format";
 import { CONGES_DEMO } from "@/lib/hooks-grh";
 import type { Profile } from "@/lib/database.types";
 
 export default function GerantDashboard({ profile }: { profile: Profile }) {
-  const { prets, clients, remboursements, caisses, users } = useStore();
-  const { can, permissions } = usePermissions();
-  const [openCongé, setOpenCongé] = useState<typeof CONGES_DEMO[0] | null>(null);
+  const { data: prets } = usePrets();
+  const { data: caisses } = useCaisses();
+  const { data: clients } = useClients();
+  const { data: profiles } = useProfiles();
+  const { can } = usePermissions();
 
-  // Caissiers de son agence
-  const mesCaissiers = users.filter(u => u.agence === profile.agence && u.role === "caissier");
-  const mesCaisses   = caisses.filter(c => c.agence === profile.agence || mesCaissiers.some(u => c.assigneeA === u.id));
+  // Caissiers de son agence + caisses rattachées
+  const mesCaissiers = profiles.filter(u => u.agence === profile.agence && u.role === "caissier");
+  const mesCaisses = caisses.filter(c =>
+    c.agence === profile.agence || mesCaissiers.some(u => (c as any).assignee_id === u.id));
+
+  const clientById = useMemo(() => {
+    const m: Record<string, (typeof clients)[number]> = {};
+    clients.forEach(c => { m[c.id] = c; });
+    return m;
+  }, [clients]);
 
   const stats = useMemo(() => {
-    const actifs   = prets.filter(p => (p.statut as string) !== "rembourse" && (p.statut as string) !== "annule");
-    const encours  = actifs.reduce((s, p) => s + resteAPayer(p, remboursements), 0);
-    const tresor   = mesCaisses.reduce((s, c) => s + c.solde, 0);
-    const enRetard = actifs.filter(p => joursDeRetard(p.echeance) > 0);
+    const actifs = prets.filter(p => p.statut !== "rembourse" && p.statut !== "annule");
+    const encours = actifs.reduce((s, p) => s + (p.reste_a_payer ?? 0), 0);
+    const tresor = mesCaisses.reduce((s, c) => s + c.solde, 0);
+    const enRetard = actifs.filter(p => (p.jours_retard ?? 0) > 0);
     const recentsP = prets.slice(0, 6).map(p => ({
-      ...p,
-      clientNom: clients.find(c => c.id === p.clientId)?.nom ?? p.clientId,
-      reste: resteAPayer(p, remboursements),
+      id: p.id, type: p.type_operation, statut: p.statut, echeance: p.echeance,
+      jours_retard: p.jours_retard ?? 0,
+      clientNom: p.client_nom ?? p.client_id,
+      reste: p.reste_a_payer ?? 0,
     }));
     return { encours, tresor, enRetard, recentsP, nbActifs: actifs.length };
-  }, [prets, clients, remboursements, mesCaisses]);
+  }, [prets, mesCaisses]);
 
-  // Congés en attente que le gérant peut approuver
   const congesEnAttente = CONGES_DEMO.filter(c => c.statut === "en_attente");
 
   return (
@@ -70,7 +80,7 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
           </div>
           <div className="space-y-3">
             {mesCaissiers.map(u => {
-              const caisse = caisses.find(c => c.assigneeA === u.id);
+              const caisse = caisses.find(c => (c as any).assignee_id === u.id);
               return (
                 <div key={u.id} className="rounded-xl border border-sand-200 px-4 py-3">
                   <div className="flex items-center justify-between">
@@ -92,7 +102,7 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
           </div>
         </Card>
 
-        {/* Prêts récents + congés */}
+        {/* Prêts récents */}
         <Card className="p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="display text-lg font-bold text-ink">Prêts & encours récents</h3>
@@ -112,18 +122,19 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
                   </div>
                   <div className="flex-shrink-0 text-right ml-3">
                     <div className="num text-sm font-semibold text-clay-700">{formatXOF(p.reste)}</div>
-                    {joursDeRetard(p.echeance) > 0 && p.statut !== "rembourse" && (
-                      <div className="text-[10px] text-ember">+{joursDeRetard(p.echeance)}j retard</div>
+                    {p.jours_retard > 0 && p.statut !== "rembourse" && (
+                      <div className="text-[10px] text-ember">+{p.jours_retard}j retard</div>
                     )}
                   </div>
                 </div>
               );
             })}
+            {stats.recentsP.length === 0 && <p className="text-sm text-ink-400">Aucun prêt récent.</p>}
           </div>
         </Card>
       </div>
 
-      {/* Alertes en retard + Congés à approuver */}
+      {/* Retards + Congés */}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-4 flex items-center gap-2">
@@ -137,13 +148,13 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
           ) : (
             <div className="space-y-2">
               {stats.enRetard.slice(0, 5).map(p => {
-                const cl = clients.find(c => c.id === p.clientId);
+                const cl = clientById[p.client_id];
                 return (
                   <div key={p.id} className="rounded-xl bg-ember-100/60 px-3 py-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-ink">{cl?.nom}</span>
+                      <span className="text-sm font-medium text-ink">{p.client_nom}</span>
                       <div className="flex items-center gap-2">
-                        <Badge className="bg-ember-100 text-ember-600">{joursDeRetard(p.echeance)}j</Badge>
+                        <Badge className="bg-ember-100 text-ember-600">{p.jours_retard}j</Badge>
                         {cl?.telephone && (
                           <a href={`tel:${cl.telephone}`}
                             className="rounded-lg bg-leaf-100 px-2 py-0.5 text-[11px] text-leaf-600 hover:bg-leaf-100/70">
@@ -153,7 +164,7 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
                       </div>
                     </div>
                     <div className="num mt-0.5 text-[12px] text-ink-500">
-                      {formatXOF(resteAPayer(p, remboursements))} restant · {cl?.ville}
+                      {formatXOF(p.reste_a_payer ?? 0)} restant · {p.client_ville}
                     </div>
                   </div>
                 );
@@ -162,7 +173,7 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
           )}
         </Card>
 
-        {/* Congés à approuver — si permission */}
+        {/* Congés à approuver (données RH — migrées en phase RH) */}
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -238,8 +249,6 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
     </div>
   );
 }
-
-// ── Sous-composants ────────────────────────────────────────
 
 function QuickAction({ href, icon: Icon, label, sub, allowed }: {
   href: string; icon: any; label: string; sub: string; allowed: boolean;

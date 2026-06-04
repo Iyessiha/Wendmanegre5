@@ -3,12 +3,13 @@
 import { useState } from "react";
 import {
   Building2, Users, Receipt, Percent, ShieldCheck,
-  Save, Plus, Trash2, Edit2, RotateCcw, Check, UserPlus, KeyRound, Power
+  Save, Plus, Trash2, Edit2, RotateCcw, Check, UserPlus, KeyRound, Power, RefreshCw
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PERMISSIONS_DEFS, type PermissionKey, GERANT_DEFAULTS } from "@/lib/permissions";
 import { useProfiles, updateProfile, useConfigFrais, saveConfigFrais, useConfigEntreprise, saveConfigEntreprise } from "@/lib/hooks2";
 import { creerUtilisateur, reinitialiserMdp, definirActif } from "@/lib/admin-users";
+import { testerDolibarr, synchroniserClients, synchroniserProduits, synchroniserFactures, synchroniserAvoirs } from "@/lib/dolibarr";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
 
@@ -18,6 +19,7 @@ const TABS = [
   { id: "frais",      label: "Frais & marges", icon: Percent },
   { id: "factures",   label: "Factures", icon: Receipt     },
   { id: "permissions", label: "Permissions", icon: ShieldCheck },
+  { id: "dolibarr",   label: "Dolibarr", icon: RefreshCw },
 ];
 
 const roleStyle: Record<string, string> = {
@@ -87,6 +89,23 @@ export default function ParametresPage() {
     try { await definirActif(u.id, actif); refetchProfiles(); }
     catch (e: any) { alert(e?.message ?? "Erreur."); }
     setBusy(false);
+  }
+
+  // Synchronisation Dolibarr
+  const [doliBusy, setDoliBusy] = useState<string | null>(null);
+  const [doliMsg, setDoliMsg]   = useState<string | null>(null);
+  const [doliErr, setDoliErr]   = useState<string | null>(null);
+  async function runDoli(kind: string, fn: () => Promise<any>) {
+    setDoliBusy(kind); setDoliErr(null); setDoliMsg(null);
+    try {
+      const r = await fn();
+      if (r?.message) setDoliMsg(r.message);
+      else setDoliMsg(
+        `${r.entity} : ${r.created} créé(s), ${r.updated} mis à jour` +
+        (r.errors?.length ? `, ${r.errors.length} erreur(s) :\n` + r.errors.slice(0, 6).join("\n") : ".")
+      );
+    } catch (e: any) { setDoliErr(e?.message ?? "Erreur."); }
+    setDoliBusy(null);
   }
 
   async function saveCfg() {
@@ -423,6 +442,49 @@ export default function ParametresPage() {
       {/* ── Permissions ── */}
       {tab === "permissions" && (
         <PermissionsPanel />
+      )}
+
+      {/* ── Dolibarr ── */}
+      {tab === "dolibarr" && (
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <RefreshCw size={18} className="text-clay" />
+            <h3 className="display text-lg font-bold text-ink">Synchronisation Dolibarr</h3>
+          </div>
+          <p className="mb-5 text-[13px] text-ink-500">
+            Envoie les données de l'application vers votre instance Dolibarr. Ordre conseillé : commerçants → produits → factures → avoirs.
+            Les factures (prêts) et avoirs (prêts annulés) ont besoin que le commerçant existe déjà dans Dolibarr. Les enregistrements déjà liés ne sont pas recréés. La clé API reste côté serveur.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <Btn variant="soft" onClick={() => runDoli("test", testerDolibarr)} className={doliBusy === "test" ? "opacity-50" : ""}>
+              {doliBusy === "test" ? "Test…" : "Tester la connexion"}
+            </Btn>
+            <Btn onClick={() => runDoli("clients", synchroniserClients)} className={doliBusy === "clients" ? "opacity-50" : ""}>
+              <Users size={15} /> {doliBusy === "clients" ? "Synchronisation…" : "Synchroniser les commerçants"}
+            </Btn>
+            <Btn onClick={() => runDoli("produits", synchroniserProduits)} className={doliBusy === "produits" ? "opacity-50" : ""}>
+              <Receipt size={15} /> {doliBusy === "produits" ? "Synchronisation…" : "Synchroniser les produits"}
+            </Btn>
+            <Btn onClick={() => runDoli("factures", synchroniserFactures)} className={doliBusy === "factures" ? "opacity-50" : ""}>
+              <Receipt size={15} /> {doliBusy === "factures" ? "Synchronisation…" : "Synchroniser les factures"}
+            </Btn>
+            <Btn variant="soft" onClick={() => runDoli("avoirs", synchroniserAvoirs)} className={doliBusy === "avoirs" ? "opacity-50" : ""}>
+              {doliBusy === "avoirs" ? "Synchronisation…" : "Synchroniser les avoirs"}
+            </Btn>
+          </div>
+
+          {doliMsg && (
+            <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-leaf-100/60 px-4 py-3 text-[12px] text-ink-700">{doliMsg}</pre>
+          )}
+          {doliErr && (
+            <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-ember-100 px-4 py-3 text-[12px] text-ember-600">{doliErr}</pre>
+          )}
+
+          <p className="mt-5 text-[11px] text-ink-400">
+            Connexion : {`https://gescom.wendmanegre.com`} · La synchronisation est réservée à l'administrateur.
+          </p>
+        </Card>
       )}
     </div>
   );

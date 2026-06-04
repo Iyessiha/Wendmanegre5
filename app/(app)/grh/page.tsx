@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Users, CalendarDays, Plane, Banknote, TrendingUp,
   Plus, Edit2, Check, X, Printer, ChevronDown,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import {
   useEmployes, useConges, usePresencesSemaine,
+  creerConge, deciderConge, sauvegarderPresence,
   calculerPaie, EMPLOYES_DEMO,
   type Employe, type StatutPresence, type TypeContrat,
 } from "@/lib/hooks-grh";
@@ -75,15 +76,28 @@ function jourLabel(iso: string) {
 export default function GRHPage() {
   const [tab, setTab] = useState("equipe");
   const { data: employes } = useEmployes();
-  const { data: conges } = useConges();
+  const { data: conges, refetch: refetchConges } = useConges();
   const [weekOffset, setWeekOffset] = useState(0);
   const weekDates = getWeekDates(weekOffset);
+  const { data: presencesDB, refetch: refetchPresences } = usePresencesSemaine(weekDates);
 
-  // État local pointage (dans une vraie app → Supabase)
-  const [presences, setPresences] = useState<Record<string, StatutPresence>>(() => {
-    const init: Record<string, StatutPresence> = {};
-    return init;
-  });
+  // État local pointage, alimenté depuis Supabase
+  const [presences, setPresences] = useState<Record<string, StatutPresence>>({});
+  useEffect(() => {
+    const m: Record<string, StatutPresence> = {};
+    presencesDB.forEach((p: any) => { m[`${p.employe_id}-${p.date_presence}`] = p.statut; });
+    setPresences(m);
+  }, [presencesDB]);
+
+  async function togglePresence(employeId: string, d: string, newSt: StatutPresence) {
+    setPresences(prev => ({ ...prev, [`${employeId}-${d}`]: newSt }));
+    try {
+      await sauvegarderPresence({
+        employe_id: employeId, date_presence: d, statut: newSt,
+        heure_arrivee: "08:00", heure_depart: "17:00", nb_heures: 8, notes: null,
+      });
+    } catch { /* le rafraîchissement corrigera l'affichage si besoin */ }
+  }
 
   // Mois paie
   const [moisPaie, setMoisPaie] = useState("2026-06");
@@ -91,6 +105,26 @@ export default function GRHPage() {
   const [openFiche, setOpenFiche] = useState<Employe | null>(null);
   const [openConge, setOpenConge] = useState(false);
   const [congeForm, setCongeForm] = useState({ employe_id: "", type: "annuel", date_debut: "", date_fin: "", motif: "" });
+  const [congeBusy, setCongeBusy] = useState(false);
+  const [congeErr, setCongeErr] = useState<string | null>(null);
+
+  async function submitConge() {
+    if (!congeForm.employe_id || !congeForm.date_debut || !congeForm.date_fin) {
+      setCongeErr("Employé et dates requis."); return;
+    }
+    setCongeBusy(true); setCongeErr(null);
+    try {
+      await creerConge(congeForm);
+      setCongeForm({ employe_id: "", type: "annuel", date_debut: "", date_fin: "", motif: "" });
+      setOpenConge(false);
+      refetchConges();
+    } catch (e: any) { setCongeErr(e?.message ?? "Erreur lors de l'enregistrement."); }
+    setCongeBusy(false);
+  }
+
+  async function decider(id: string, statut: "approuve" | "refuse") {
+    try { await deciderConge(id, statut); refetchConges(); } catch {}
+  }
 
   // Calculs paie du mois
   const fichesPaie = useMemo(() => employes.map(emp => {
@@ -227,7 +261,7 @@ export default function GRHPage() {
                                   const cur = statut;
                                   const idx = next.indexOf(cur);
                                   const newSt = next[(idx + 1) % next.length];
-                                  setPresences(prev => ({ ...prev, [`${emp.id}-${d}`]: newSt }));
+                                  togglePresence(emp.id, d, newSt);
                                 }}
                                 title={isFuture ? "" : `Cliquer pour changer · ${st.label}`}
                                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-[11px] font-bold transition-all ${
@@ -314,10 +348,10 @@ export default function GRHPage() {
                       </div>
                       {c.statut === "en_attente" && (
                         <div className="flex gap-2 flex-shrink-0">
-                          <button className="inline-flex items-center gap-1 rounded-lg bg-leaf-100 px-3 py-1.5 text-[12px] font-medium text-leaf-600 hover:bg-leaf-100/70">
+                          <button onClick={() => decider(c.id, "approuve")} className="inline-flex items-center gap-1 rounded-lg bg-leaf-100 px-3 py-1.5 text-[12px] font-medium text-leaf-600 hover:bg-leaf-100/70">
                             <Check size={13} /> Approuver
                           </button>
-                          <button className="inline-flex items-center gap-1 rounded-lg bg-ember-100 px-3 py-1.5 text-[12px] font-medium text-ember-600 hover:bg-ember-100/70">
+                          <button onClick={() => decider(c.id, "refuse")} className="inline-flex items-center gap-1 rounded-lg bg-ember-100 px-3 py-1.5 text-[12px] font-medium text-ember-600 hover:bg-ember-100/70">
                             <X size={13} /> Refuser
                           </button>
                         </div>
@@ -581,9 +615,10 @@ export default function GRHPage() {
           <Field label="Date fin"><input className={inputCls} type="date" value={congeForm.date_fin} onChange={e => setCongeForm(f => ({ ...f, date_fin: e.target.value }))} /></Field>
         </div>
         <Field label="Motif"><input className={inputCls} value={congeForm.motif} onChange={e => setCongeForm(f => ({ ...f, motif: e.target.value }))} placeholder="Optionnel" /></Field>
+        {congeErr && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{congeErr}</p>}
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpenConge(false)}>Annuler</Btn>
-          <Btn onClick={() => setOpenConge(false)}>Enregistrer</Btn>
+          <Btn onClick={submitConge} className={congeBusy ? "opacity-50" : ""}>{congeBusy ? "Enregistrement…" : "Enregistrer"}</Btn>
         </div>
       </Modal>
     </div>

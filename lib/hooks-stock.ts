@@ -156,26 +156,78 @@ export function useProduits() {
 
 export function useFournisseurs() {
   const [data, setData] = useState<Fournisseur[]>(FOURNISSEURS_DEMO);
-  const [loading, setLoading] = useState(false);
-  return { data, loading };
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    try {
+      const { data: rows, error } = await (getClient() as any).from("fournisseurs").select("*").order("nom");
+      if (error) throw error;
+      setData(rows ?? []);
+    } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
 }
 
 export function useCommandes() {
   const [data, setData] = useState<CommandeFournisseur[]>(COMMANDES_DEMO);
-  const [loading, setLoading] = useState(false);
-  return { data, loading };
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    try {
+      const { data: rows, error } = await (getClient() as any)
+        .from("commandes_fournisseurs")
+        .select("*, fournisseur:fournisseurs(nom), lignes:commandes_lignes(*)")
+        .order("date_commande", { ascending: false });
+      if (error) throw error;
+      setData((rows ?? []).map((c: any) => ({
+        ...c,
+        fournisseur_nom: c.fournisseur?.nom ?? "",
+        lignes: (c.lignes ?? []).map((l: any) => ({
+          id: l.id, produit_id: l.produit_id, produit_nom: l.description ?? "",
+          description: l.description, quantite: l.quantite, prix_unitaire: l.prix_unitaire, montant: l.montant,
+        })),
+      })));
+    } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
 }
 
 export function useMouvements() {
   const [data, setData] = useState<MouvementStock[]>(MOUVEMENTS_DEMO);
-  const [loading, setLoading] = useState(false);
-  return { data, loading };
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    try {
+      const { data: rows, error } = await (getClient() as any)
+        .from("mouvements_stock")
+        .select("*, produit:produits(nom)")
+        .order("date_mvt", { ascending: false }).limit(50);
+      if (error) throw error;
+      setData((rows ?? []).map((m: any) => ({ ...m, produit_nom: m.produit?.nom ?? "" })));
+    } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
 }
 
 export function useVentes() {
   const [data, setData] = useState<Vente[]>(VENTES_DEMO);
-  const [loading, setLoading] = useState(false);
-  return { data, loading };
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    try {
+      const { data: rows, error } = await (getClient() as any)
+        .from("ventes")
+        .select("*, produit:produits(nom)")
+        .order("date_vente", { ascending: false }).limit(100);
+      if (error) throw error;
+      setData((rows ?? []).map((v: any) => ({ ...v, produit_nom: v.produit?.nom ?? "" })));
+    } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
 }
 
 export async function creerVente(input: {
@@ -195,6 +247,63 @@ export async function creerVente(input: {
       caisse_id: input.caisse_id ?? null, vendu_par: input.user_id ?? null,
     });
   } catch (e) { console.warn("Vente en mode demo seulement:", e); }
+}
+
+export async function creerCommande(input: {
+  fournisseur_id: string; date_livraison_prevue?: string; notes?: string;
+  lignes: { produit_id?: string; description: string; quantite: number; prix_unitaire: number }[];
+}): Promise<string> {
+  const sb = getClient() as any;
+  const montant_total = input.lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
+  const { data: cmd, error } = await sb.from("commandes_fournisseurs").insert({
+    fournisseur_id: input.fournisseur_id,
+    date_livraison_prevue: input.date_livraison_prevue || null,
+    notes: input.notes || null, statut: "brouillon", montant_total,
+  }).select("id").single();
+  if (error) throw error;
+  const lignes = input.lignes.map(l => ({
+    commande_id: cmd.id, produit_id: l.produit_id || null, description: l.description,
+    quantite: l.quantite, prix_unitaire: l.prix_unitaire, montant: l.quantite * l.prix_unitaire,
+  }));
+  const { error: e2 } = await sb.from("commandes_lignes").insert(lignes);
+  if (e2) throw e2;
+  return cmd.id;
+}
+
+export async function changerStatutCommande(id: string, statut: string): Promise<void> {
+  const { error } = await (getClient() as any).from("commandes_fournisseurs").update({ statut }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function recevoirCommande(commande: CommandeFournisseur): Promise<void> {
+  const sb = getClient() as any;
+  const { data: rec, error } = await sb.from("receptions").insert({
+    commande_id: commande.id, date_reception: new Date().toISOString().slice(0, 10),
+  }).select("id").single();
+  if (error) throw error;
+  const lignes = commande.lignes
+    .filter(l => l.produit_id)
+    .map(l => ({ reception_id: rec.id, produit_id: l.produit_id, quantite_cmd: l.quantite, quantite_recue: l.quantite }));
+  if (lignes.length) {
+    const { error: e2 } = await sb.from("receptions_lignes").insert(lignes);
+    if (e2) throw e2;
+  }
+  await sb.from("commandes_fournisseurs").update({ statut: "recue" }).eq("id", commande.id);
+}
+
+export async function creerProduit(input: {
+  nom: string; categorie: string; code_barre?: string; prix_unitaire: number;
+  prix_achat: number; stock: number; seuil_alerte: number; entrepot: string;
+  fournisseur_id?: string; notes?: string;
+}): Promise<void> {
+  const id = "PRD-" + Date.now().toString(36).toUpperCase();
+  const { error } = await (getClient() as any).from("produits").insert({
+    id, nom: input.nom, categorie: input.categorie, code_barre: input.code_barre || null,
+    prix_unitaire: input.prix_unitaire, prix_achat: input.prix_achat, stock: input.stock,
+    seuil_alerte: input.seuil_alerte, entrepot: input.entrepot,
+    fournisseur_id: input.fournisseur_id || null, notes: input.notes || null, actif: true,
+  });
+  if (error) throw error;
 }
 
 export async function ajusterStock(produit_id: string, quantite: number, motif: string): Promise<void> {
