@@ -10,7 +10,7 @@ import { PermissionsProvider } from "@/lib/permissions";
 import type { Profile } from "@/lib/database.types";
 
 const ADMIN_ONLY  = ["/caisses", "/boutique", "/parametres", "/comptabilite", "/grh"];
-const GERANT_SKIP = ["/parametres"]; // gerant ne peut pas aller dans paramètres système
+const GERANT_SKIP = ["/parametres", "/utilisateurs"]; // gerant ne peut pas aller dans paramètres système ni gestion des comptes
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router  = useRouter();

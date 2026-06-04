@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Building2, Users, Receipt, Percent, ShieldCheck,
   Save, Plus, Trash2, Edit2, RotateCcw, Check, UserPlus, KeyRound, Power, RefreshCw
@@ -9,13 +9,12 @@ import { useStore } from "@/lib/store";
 import { PERMISSIONS_DEFS, type PermissionKey, GERANT_DEFAULTS } from "@/lib/permissions";
 import { useProfiles, updateProfile, useConfigFrais, saveConfigFrais, useConfigEntreprise, saveConfigEntreprise } from "@/lib/hooks2";
 import { creerUtilisateur, reinitialiserMdp, definirActif } from "@/lib/admin-users";
-import { testerDolibarr, synchroniserClients, synchroniserProduits, synchroniserFactures, synchroniserAvoirs } from "@/lib/dolibarr";
+import { testerDolibarr, synchroniserClients, synchroniserProduits, synchroniserFactures, synchroniserAvoirs, synchroniserCommandes, synchroniserFacturesClients, importerDepuisDolibarr } from "@/lib/dolibarr";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
 
 const TABS = [
   { id: "entreprise", label: "Entreprise", icon: Building2 },
-  { id: "users",      label: "Utilisateurs", icon: Users   },
   { id: "frais",      label: "Frais & marges", icon: Percent },
   { id: "factures",   label: "Factures", icon: Receipt     },
   { id: "permissions", label: "Permissions", icon: ShieldCheck },
@@ -107,6 +106,29 @@ export default function ParametresPage() {
     } catch (e: any) { setDoliErr(e?.message ?? "Erreur."); }
     setDoliBusy(null);
   }
+
+  // Import Dolibarr → app (manuel + auto 5 s)
+  const [autoImport, setAutoImport] = useState(false);
+  const [lastImport, setLastImport] = useState<string | null>(null);
+  const importRunning = useRef(false);
+  async function lancerImport() {
+    if (importRunning.current) return;
+    importRunning.current = true;
+    setDoliBusy("import"); setDoliErr(null);
+    try {
+      const r = await importerDepuisDolibarr();
+      setDoliMsg(r?.message ?? "Import terminé.");
+      setLastImport(new Date().toLocaleTimeString("fr-FR"));
+    } catch (e: any) { setDoliErr(e?.message ?? "Erreur d'import."); }
+    importRunning.current = false; setDoliBusy(null);
+  }
+  useEffect(() => {
+    if (!autoImport) return;
+    lancerImport();
+    const id = setInterval(() => { lancerImport(); }, 5000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoImport]);
 
   async function saveCfg() {
     setCfgSaving(true);
@@ -452,10 +474,33 @@ export default function ParametresPage() {
             <h3 className="display text-lg font-bold text-ink">Synchronisation Dolibarr</h3>
           </div>
           <p className="mb-5 text-[13px] text-ink-500">
-            Envoie les données de l'application vers votre instance Dolibarr. Ordre conseillé : commerçants → produits → factures → avoirs.
-            Les factures (prêts) et avoirs (prêts annulés) ont besoin que le commerçant existe déjà dans Dolibarr. Les enregistrements déjà liés ne sont pas recréés. La clé API reste côté serveur.
+            Envoie les données vers Dolibarr. Ordre conseillé : commerçants → produits, puis les documents.
+            « Commandes clients » et « Factures clients » envoient le module Facturation de l'app vers les commandes et factures Dolibarr ; « Factures/Avoirs de prêts » concernent vos prêts. Les documents ont besoin que le commerçant existe déjà dans Dolibarr. Les enregistrements déjà liés ne sont pas recréés. La clé API reste côté serveur.
           </p>
 
+          <div className="mb-5 rounded-xl border border-clay/30 bg-clay/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[14px] font-semibold text-ink">Importer depuis Dolibarr → application</div>
+                <div className="text-[12px] text-ink-500">
+                  Récupère les commerçants et produits existants dans Dolibarr.
+                  {lastImport ? ` Dernier import : ${lastImport}.` : ""}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Btn onClick={lancerImport} className={doliBusy === "import" ? "opacity-50" : ""}>
+                  <RefreshCw size={15} /> {doliBusy === "import" ? "Import…" : "Importer maintenant"}
+                </Btn>
+                <button onClick={() => setAutoImport(v => !v)}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium transition-colors ${autoImport ? "border-leaf-300 bg-leaf-100 text-leaf-700" : "border-sand-200 bg-white text-ink-500"}`}>
+                  <span className={`h-2 w-2 rounded-full ${autoImport ? "animate-pulse bg-leaf-500" : "bg-ink-300"}`} />
+                  Auto 5 s {autoImport ? "activé" : "désactivé"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-400">Envoyer vers Dolibarr (optionnel)</div>
           <div className="flex flex-wrap gap-2">
             <Btn variant="soft" onClick={() => runDoli("test", testerDolibarr)} className={doliBusy === "test" ? "opacity-50" : ""}>
               {doliBusy === "test" ? "Test…" : "Tester la connexion"}
@@ -467,10 +512,16 @@ export default function ParametresPage() {
               <Receipt size={15} /> {doliBusy === "produits" ? "Synchronisation…" : "Synchroniser les produits"}
             </Btn>
             <Btn onClick={() => runDoli("factures", synchroniserFactures)} className={doliBusy === "factures" ? "opacity-50" : ""}>
-              <Receipt size={15} /> {doliBusy === "factures" ? "Synchronisation…" : "Synchroniser les factures"}
+              <Receipt size={15} /> {doliBusy === "factures" ? "Synchronisation…" : "Factures de prêts"}
             </Btn>
             <Btn variant="soft" onClick={() => runDoli("avoirs", synchroniserAvoirs)} className={doliBusy === "avoirs" ? "opacity-50" : ""}>
-              {doliBusy === "avoirs" ? "Synchronisation…" : "Synchroniser les avoirs"}
+              {doliBusy === "avoirs" ? "Synchronisation…" : "Avoirs de prêts"}
+            </Btn>
+            <Btn onClick={() => runDoli("commandes", synchroniserCommandes)} className={doliBusy === "commandes" ? "opacity-50" : ""}>
+              <Receipt size={15} /> {doliBusy === "commandes" ? "Synchronisation…" : "Commandes clients"}
+            </Btn>
+            <Btn onClick={() => runDoli("facturesClients", synchroniserFacturesClients)} className={doliBusy === "facturesClients" ? "opacity-50" : ""}>
+              <Receipt size={15} /> {doliBusy === "facturesClients" ? "Synchronisation…" : "Factures clients"}
             </Btn>
           </div>
 

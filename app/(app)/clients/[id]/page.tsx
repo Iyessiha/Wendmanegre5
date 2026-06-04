@@ -7,6 +7,8 @@ import { useClients, usePrets, useCaisses, octroyerPret, enregistrerRemboursemen
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { getDemoSession } from "@/lib/demo-session";
 import { PageHeader, Card, Btn, Badge, Modal, Field, inputCls } from "@/components/ui";
+import { PhotoProfil, PiecesJointesBloc } from "@/components/FicheMedia";
+import { useHistoriqueClient } from "@/lib/hooks-factures";
 import { formatXOF, formatDate, statutLabel } from "@/lib/format";
 
 const TYPES = ["ORANGE MONEY", "MOOV MONEY", "TELECEL", "UNITES", "CASH", "SIM", "TRANSFERT INTL"];
@@ -19,6 +21,7 @@ export default function ClientDetail() {
   const { data: clients } = useClients();
   const { data: mesP, refetch: refetchPrets } = usePrets({ clientId: id });
   const { data: caisses } = useCaisses();
+  const { data: historique } = useHistoriqueClient(id);
 
   const client = clients.find((c) => c.id === id);
 
@@ -116,12 +119,20 @@ export default function ClientDetail() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-5">
+          <div className="mb-4 flex items-center gap-4">
+            <PhotoProfil entite="client" id={client.id} nom={client.nom} photoUrl={(client as any).photo_url} />
+            <div>
+              <div className="display text-base font-bold text-ink">{client.nom}</div>
+              {(client as any).nom_alternatif && <div className="text-[12px] text-ink-500">{(client as any).nom_alternatif}</div>}
+            </div>
+          </div>
           <h3 className="display mb-3 text-base font-bold text-ink">Coordonnées</h3>
           <ul className="space-y-2.5 text-sm">
             <li className="flex items-center gap-2 text-ink-700"><CreditCard size={15} className="text-ink-400" /> <span className="num">{client.id}</span></li>
             <li className="flex items-center gap-2 text-ink-700"><MapPin size={15} className="text-ink-400" /> {client.ville}</li>
             <li className="flex items-center gap-2 text-ink-700"><Phone size={15} className="text-ink-400" /> <span className="num">{client.telephone}</span></li>
             {(client as any).cnib && <li className="text-ink-500">CNIB : <span className="num">{(client as any).cnib}</span></li>}
+            {(client as any).identifiant_pro1 && <li className="text-ink-500">ID pro : <span className="num">{(client as any).identifiant_pro1}</span></li>}
             {(client as any).date_creation && <li className="text-ink-400">Client depuis {formatDate((client as any).date_creation)}</li>}
           </ul>
         </Card>
@@ -144,6 +155,36 @@ export default function ClientDetail() {
           <p className="mt-2 text-[12px] text-ink-500">Taux de remboursement historique sur {formatXOF(data.totalOctroye)} octroyés</p>
         </Card>
       </div>
+
+      <Card className="mt-5 p-5">
+        <PiecesJointesBloc entite="client" id={client.id} />
+      </Card>
+
+      <Card className="mt-5 overflow-hidden">
+        <div className="border-b border-sand-200 px-5 py-4">
+          <h3 className="display text-lg font-bold text-ink">Chronologie</h3>
+          <p className="text-[12px] text-ink-400">Prêts, remboursements, factures et encaissements</p>
+        </div>
+        <div className="divide-y divide-sand-100">
+          {historique.map((e, i) => {
+            const credit = e.sens === "credit";
+            const couleur = { pret: "bg-clay-100 text-clay-700", facture: "bg-blue-100 text-blue-700", commande: "bg-sand-200 text-ink-600", remboursement: "bg-leaf-100 text-leaf-600", paiement: "bg-leaf-100 text-leaf-600" }[e.type];
+            return (
+              <div key={i} className="flex items-center justify-between px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <span className={`flex h-7 items-center rounded-lg px-2 text-[11px] font-medium ${couleur}`}>{e.type}</span>
+                  <div>
+                    <div className="text-[13px] font-medium text-ink">{e.libelle}</div>
+                    <div className="text-[11px] text-ink-400">{formatDate(e.date)}{e.statut ? ` · ${e.statut}` : ""}</div>
+                  </div>
+                </div>
+                <div className={`num text-sm font-semibold ${credit ? "text-leaf-600" : "text-clay-700"}`}>{credit ? "−" : "+"}{formatXOF(e.montant)}</div>
+              </div>
+            );
+          })}
+          {historique.length === 0 && <div className="px-5 py-8 text-center text-[13px] text-ink-400">Aucun mouvement.</div>}
+        </div>
+      </Card>
 
       <Card className="mt-5 overflow-hidden">
         <div className="flex items-center gap-2 border-b border-sand-200 px-5 py-4">

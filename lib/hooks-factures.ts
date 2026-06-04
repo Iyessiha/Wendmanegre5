@@ -154,3 +154,48 @@ export async function convertirEnFacture(commandeId: string, user_id?: string): 
     lignes: (c.lignes ?? []).map(l => ({ designation: l.designation, quantite: l.quantite, prix_unitaire: l.prix_unitaire })),
   });
 }
+
+// ── Chronologie unifiée d'un commerçant (prêts + remboursements + factures + paiements) ──
+export interface EvenementClient {
+  date: string;
+  type: "pret" | "remboursement" | "facture" | "commande" | "paiement";
+  libelle: string;
+  montant: number;
+  sens: "debit" | "credit";
+  ref?: string;
+  statut?: string;
+}
+
+export function useHistoriqueClient(clientId?: string) {
+  const [data, setData] = useState<EvenementClient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const refetch = useCallback(async () => {
+    if (!clientId) { setData([]); setLoading(false); return; }
+    setLoading(true);
+    const sb = getClient() as any;
+    try {
+      const [pr, fa] = await Promise.all([
+        sb.from("v_prets_encours").select("*").eq("client_id", clientId),
+        sb.from("factures").select("id,type,date_facture,montant_total,statut").eq("client_id", clientId),
+      ]);
+      const prets = pr.data ?? [];
+      const factures = fa.data ?? [];
+      const pretIds = prets.map((p: any) => p.id);
+      const facIds = factures.map((f: any) => f.id);
+      const [rb, pay] = await Promise.all([
+        pretIds.length ? sb.from("remboursements").select("*").in("pret_id", pretIds) : Promise.resolve({ data: [] }),
+        facIds.length ? sb.from("factures_paiements").select("*").in("facture_id", facIds) : Promise.resolve({ data: [] }),
+      ]);
+      const ev: EvenementClient[] = [];
+      prets.forEach((p: any) => ev.push({ date: p.date_octroi, type: "pret", libelle: `Prêt ${p.id} — ${p.type_operation}`, montant: p.montant, sens: "debit", ref: p.id, statut: p.statut }));
+      (rb.data ?? []).forEach((r: any) => ev.push({ date: r.date_remb ?? r.created_at, type: "remboursement", libelle: `Remboursement ${r.pret_id}${r.mode ? " (" + r.mode + ")" : ""}`, montant: r.montant, sens: "credit", ref: r.pret_id }));
+      factures.forEach((f: any) => ev.push({ date: f.date_facture, type: f.type, libelle: `${f.type === "facture" ? "Facture" : "Commande"} ${f.id}`, montant: f.montant_total, sens: "debit", ref: f.id, statut: f.statut }));
+      (pay.data ?? []).forEach((p: any) => ev.push({ date: p.date_paiement, type: "paiement", libelle: `Encaissement ${p.facture_id} (${p.mode})`, montant: p.montant, sens: "credit", ref: p.facture_id }));
+      ev.sort((a, b) => (a.date < b.date ? 1 : -1));
+      setData(ev);
+    } catch { setData([]); }
+    setLoading(false);
+  }, [clientId]);
+  useEffect(() => { refetch(); }, [refetch]);
+  return { data, loading, refetch };
+}

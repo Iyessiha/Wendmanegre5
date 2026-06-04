@@ -225,6 +225,22 @@ export async function transfererCaisse(input: {
   if (err2.error) throw err2.error;
 }
 
+// ─── Gestion des caisses (admin/gérant) ───────────────────
+export async function creerCaisse(input: { nom: string; agence: string; assignee_id?: string | null; solde?: number }) {
+  const id = "c-" + Math.random().toString(36).slice(2, 8);
+  const { error } = await (getClient().from("caisses") as any).insert({
+    id, nom: input.nom, agence: input.agence,
+    assignee_id: input.assignee_id || null, solde: input.solde ?? 0, actif: true,
+  });
+  if (error) throw error;
+  return id;
+}
+
+export async function modifierCaisse(id: string, patch: { nom?: string; agence?: string; assignee_id?: string | null; actif?: boolean }) {
+  const { error } = await (getClient().from("caisses") as any).update(patch).eq("id", id);
+  if (error) throw error;
+}
+
 // ─── Mouvements de caisse ──────────────────────────────────
 
 export function useMouvements(caisseId?: string): UseResult<MouvementCaisse[]> {

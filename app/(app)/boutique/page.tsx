@@ -5,7 +5,7 @@ import {
   Package, Warehouse, Truck, History, ClipboardList,
   BarChart2, Plus, Search, Edit2, Printer, ShoppingCart,
   ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle,
-  Check, X, ChevronDown, Filter, Trash2,
+  Check, X, ChevronDown, Filter, Trash2, Image as ImageIcon,
 } from "lucide-react";
 import {
   useProduits, useFournisseurs, useCommandes, useMouvements, useVentes,
@@ -15,6 +15,7 @@ import {
   type Produit, type CommandeFournisseur, type Entrepot,
 } from "@/lib/hooks-stock";
 import { useProfiles } from "@/lib/hooks2";
+import { PhotoProfil } from "@/components/FicheMedia";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
 import {
@@ -128,6 +129,7 @@ export default function BoutiquePage() {
   const [venteForm, setVenteForm] = useState({ quantite: "1", remise: "0", mode: "Espèces", client_nom: "", client_tel: "" });
   const [ajustForm, setAjustForm] = useState({ quantite: "", motif: "perte", notes: "" });
   const [prodForm, setProdForm] = useState({ nom: "", categorie: "SIM", code_barre: "", prix_unitaire: "", prix_achat: "", stock: "", seuil_alerte: "10", entrepot: "Yako Centre", fournisseur_id: "", notes: "" });
+  const [openPhoto, setOpenPhoto] = useState<any>(null);
 
   // Stats globales
   const stats = useMemo(() => {
@@ -346,8 +348,17 @@ export default function BoutiquePage() {
                     return (
                       <tr key={p.id} className="border-b border-sand-100 last:border-0 hover:bg-sand-100/60">
                         <td className="px-4 py-3.5">
-                          <div className="font-medium text-ink">{p.nom}</div>
-                          {p.code_barre && <div className="num text-[10px] text-ink-400">{p.code_barre}</div>}
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sand-100">
+                              {(p as any).photo_url
+                                ? <img src={(p as any).photo_url} alt={p.nom} className="h-full w-full object-cover" />
+                                : <Package size={15} className="text-ink-300" />}
+                            </span>
+                            <div>
+                              <div className="font-medium text-ink">{p.nom}</div>
+                              {p.code_barre && <div className="num text-[10px] text-ink-400">{p.code_barre}</div>}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-ink-600">{p.categorie}</td>
                         <td className="px-4 py-3.5 text-ink-500 text-[13px]">{p.entrepot}</td>
@@ -371,6 +382,10 @@ export default function BoutiquePage() {
                             <button onClick={() => { setOpenAjustement(p); setAjustForm({ quantite:"", motif:"perte", notes:"" }); }}
                               title="Ajuster stock" className="p-1.5 rounded-lg bg-sand-200 text-ink-600 hover:bg-sand-300 tap">
                               <RefreshCw size={14} />
+                            </button>
+                            <button onClick={() => setOpenPhoto(p)}
+                              title="Photo du produit" className="p-1.5 rounded-lg bg-sand-200 text-ink-600 hover:bg-sand-300 tap">
+                              <ImageIcon size={14} />
                             </button>
                           </div>
                         </td>
@@ -828,6 +843,18 @@ export default function BoutiquePage() {
             </div>
           </>
         )}
+      </Modal>
+
+      <Modal open={!!openPhoto} onClose={() => setOpenPhoto(null)} title={`Photo — ${openPhoto?.nom ?? ""}`}>
+        {openPhoto && (
+          <div className="flex flex-col items-center gap-3 py-2">
+            <PhotoProfil entite="produit" id={openPhoto.id} nom={openPhoto.nom} photoUrl={openPhoto.photo_url} />
+            <p className="text-center text-[12px] text-ink-400">Ajoutez une photo du produit (visible dans le catalogue).</p>
+          </div>
+        )}
+        <div className="mt-2 flex justify-end">
+          <Btn variant="ghost" onClick={() => { setOpenPhoto(null); refetchProduits(); }}>Fermer</Btn>
+        </div>
       </Modal>
 
       {/* Détail commande */}

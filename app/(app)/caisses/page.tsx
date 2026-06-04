@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Wallet, Plus, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, User as UserIcon } from "lucide-react";
-import { useCaisses, useMouvements, alimenterCaisse, transfererCaisse } from "@/lib/hooks";
+import { Wallet, Plus, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, User as UserIcon, Edit2 } from "lucide-react";
+import { useCaisses, useMouvements, alimenterCaisse, transfererCaisse, creerCaisse, modifierCaisse } from "@/lib/hooks";
+import { useProfiles } from "@/lib/hooks2";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { getDemoSession } from "@/lib/demo-session";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
@@ -11,6 +12,32 @@ import { formatXOF, formatDate } from "@/lib/format";
 export default function CaissesPage() {
   const { data: caisses, refetch: refetchCaisses } = useCaisses();
   const { data: mouvements, refetch: refetchMvt } = useMouvements();
+  const { data: profiles } = useProfiles();
+
+  // Création / modification de caisse (admin / gérant)
+  const [openNewCaisse, setOpenNewCaisse] = useState(false);
+  const [editCaisse, setEditCaisse] = useState<any>(null);
+  const [cForm, setCForm] = useState({ nom: "", agence: "Yako Centre", assignee_id: "", actif: true });
+  const [cBusy, setCBusy] = useState(false);
+  const [cErr, setCErr] = useState<string | null>(null);
+
+  function ouvrirNewCaisse() { setCErr(null); setCForm({ nom: "", agence: "Yako Centre", assignee_id: "", actif: true }); setOpenNewCaisse(true); }
+  function ouvrirEditCaisse(c: any) { setCErr(null); setCForm({ nom: c.nom, agence: c.agence, assignee_id: c.assignee_id ?? "", actif: c.actif ?? true }); setEditCaisse(c); }
+  async function submitNewCaisse() {
+    if (!cForm.nom.trim()) { setCErr("Le nom est requis."); return; }
+    setCBusy(true); setCErr(null);
+    try { await creerCaisse({ nom: cForm.nom.trim(), agence: cForm.agence, assignee_id: cForm.assignee_id || null }); setOpenNewCaisse(false); refetchCaisses(); }
+    catch (e: any) { setCErr(e?.message ?? "Erreur lors de la création."); }
+    setCBusy(false);
+  }
+  async function submitEditCaisse() {
+    if (!editCaisse) return;
+    if (!cForm.nom.trim()) { setCErr("Le nom est requis."); return; }
+    setCBusy(true); setCErr(null);
+    try { await modifierCaisse(editCaisse.id, { nom: cForm.nom.trim(), agence: cForm.agence, assignee_id: cForm.assignee_id || null, actif: cForm.actif }); setEditCaisse(null); refetchCaisses(); }
+    catch (e: any) { setCErr(e?.message ?? "Erreur lors de la modification."); }
+    setCBusy(false);
+  }
 
   const [userId, setUserId] = useState("");
   const [openAlim, setOpenAlim] = useState<string | null>(null);
@@ -59,7 +86,8 @@ export default function CaissesPage() {
 
   return (
     <div className="animate-fade-up">
-      <PageHeader title="Caisses" subtitle={`Trésorerie totale : ${formatXOF(total)}`} />
+      <PageHeader title="Caisses" subtitle={`Trésorerie totale : ${formatXOF(total)}`}
+        action={<Btn onClick={ouvrirNewCaisse}><Plus size={16} /> <span className="hidden sm:inline">Nouvelle caisse</span></Btn>} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
         {caisses.map((c) => {
@@ -82,6 +110,9 @@ export default function CaissesPage() {
                   </Btn>
                   <Btn variant="ghost" onClick={() => { setErreur(null); setTransf({ toId: "", montant: "", libelle: "Transfert interne" }); setOpenTransf(c.id); }} className="!px-3 !py-2">
                     <ArrowLeftRight size={15} />
+                  </Btn>
+                  <Btn variant="ghost" onClick={() => ouvrirEditCaisse(c)} className="!px-3 !py-2">
+                    <Edit2 size={15} />
                   </Btn>
                 </div>
               </div>
@@ -170,6 +201,48 @@ export default function CaissesPage() {
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpenTransf(null)}>Annuler</Btn>
           <Btn onClick={() => openTransf && submitTransf(openTransf)} className={busy ? "opacity-50" : ""}>{busy ? "…" : "Transférer"}</Btn>
+        </div>
+      </Modal>
+
+      {/* Modal nouvelle caisse */}
+      <Modal open={openNewCaisse} onClose={() => setOpenNewCaisse(false)} title="Nouvelle caisse">
+        <Field label="Nom de la caisse"><input className={inputCls} value={cForm.nom} onChange={e => setCForm(f => ({ ...f, nom: e.target.value }))} placeholder="Caisse principale" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Agence"><input className={inputCls} value={cForm.agence} onChange={e => setCForm(f => ({ ...f, agence: e.target.value }))} /></Field>
+          <Field label="Caissier assigné">
+            <select className={inputCls} value={cForm.assignee_id} onChange={e => setCForm(f => ({ ...f, assignee_id: e.target.value }))}>
+              <option value="">— Aucun (réserve) —</option>
+              {profiles.filter((p: any) => p.role === "caissier" || p.role === "gerant").map((p: any) => <option key={p.id} value={p.id}>{p.nom} ({p.role})</option>)}
+            </select>
+          </Field>
+        </div>
+        {cErr && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{cErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setOpenNewCaisse(false)}>Annuler</Btn>
+          <Btn onClick={submitNewCaisse} className={cBusy ? "opacity-50" : ""}>{cBusy ? "Création…" : "Créer la caisse"}</Btn>
+        </div>
+      </Modal>
+
+      {/* Modal modification caisse */}
+      <Modal open={!!editCaisse} onClose={() => setEditCaisse(null)} title={`Modifier — ${editCaisse?.nom ?? ""}`}>
+        <Field label="Nom de la caisse"><input className={inputCls} value={cForm.nom} onChange={e => setCForm(f => ({ ...f, nom: e.target.value }))} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Agence"><input className={inputCls} value={cForm.agence} onChange={e => setCForm(f => ({ ...f, agence: e.target.value }))} /></Field>
+          <Field label="Caissier assigné">
+            <select className={inputCls} value={cForm.assignee_id} onChange={e => setCForm(f => ({ ...f, assignee_id: e.target.value }))}>
+              <option value="">— Aucun (réserve) —</option>
+              {profiles.filter((p: any) => p.role === "caissier" || p.role === "gerant").map((p: any) => <option key={p.id} value={p.id}>{p.nom} ({p.role})</option>)}
+            </select>
+          </Field>
+        </div>
+        <label className="mt-1 flex items-center gap-2 text-[13px] text-ink-600">
+          <input type="checkbox" checked={cForm.actif} onChange={e => setCForm(f => ({ ...f, actif: e.target.checked }))} />
+          Caisse active
+        </label>
+        {cErr && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{cErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setEditCaisse(null)}>Annuler</Btn>
+          <Btn onClick={submitEditCaisse} className={cBusy ? "opacity-50" : ""}>{cBusy ? "…" : "Enregistrer"}</Btn>
         </div>
       </Modal>
     </div>

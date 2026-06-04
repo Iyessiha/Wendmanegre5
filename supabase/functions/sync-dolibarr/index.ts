@@ -45,7 +45,6 @@ Deno.serve(async (req) => {
       return { ok: res.ok, status: res.status, data: parsed };
     }
     const idOf = (d: any) => typeof d === "number" ? String(d) : String(d?.id ?? d);
-
     const body = await req.json().catch(() => ({}));
     const action = body.action as string;
 
@@ -168,6 +167,59 @@ Deno.serve(async (req) => {
         } catch (e) { errors.push(`${p.id}: ${String((e as Error)?.message ?? e)}`); }
       }
       const msg = `Avoirs : ${created} créé(s), ${validated} validé(s)` + (errors.length ? `, ${errors.length} à vérifier :\n` + errors.slice(0, 6).join("\n") : ".");
+      return json({ ok: true, message: msg });
+    }
+
+
+    if (action === "sync_commandes") {
+      const { data: cmds } = await admin.from("factures").select("*, lignes:factures_lignes(*)").eq("type", "commande").neq("statut", "annulee");
+      const { data: clients } = await admin.from("clients").select("id,dolibarr_id");
+      const cmap: Record<string, string> = {}; (clients ?? []).forEach((c: any) => { if (c.dolibarr_id) cmap[c.id] = c.dolibarr_id; });
+      let created = 0, validated = 0; const errors: string[] = [];
+      for (const c of cmds ?? []) {
+        try {
+          if (c.dolibarr_id) continue;
+          const socid = cmap[c.client_id];
+          if (!socid) { errors.push(`${c.id}: client non synchronisé`); continue; }
+          const lignes = (c.lignes ?? []).sort((a: any, b: any) => (a.rang ?? 0) - (b.rang ?? 0))
+            .map((l: any) => ({ desc: l.designation, subprice: l.prix_unitaire, qty: l.quantite, tva_tx: 0 }));
+          const payload: any = { socid, type: 0, date: c.date_facture, ref_client: c.id, note_private: c.notes ?? `Commande ${c.id}`, lines: lignes };
+          const cr = await doli("POST", "/orders", payload);
+          if (!cr.ok) { errors.push(`${c.id}: création ${cr.status} ${errDetail(cr.data)}`); continue; }
+          const oid = idOf(cr.data);
+          await admin.from("factures").update({ dolibarr_id: oid }).eq("id", c.id);
+          created++;
+          const val = await doli("POST", `/orders/${oid}/validate`, {});
+          if (val.ok) validated++; else errors.push(`${c.id}: commande créée mais non validée (${val.status})`);
+        } catch (e) { errors.push(`${c.id}: ${String((e as Error)?.message ?? e)}`); }
+      }
+      const msg = `Commandes clients : ${created} créée(s), ${validated} validée(s)` + (errors.length ? `, ${errors.length} à vérifier :\n` + errors.slice(0, 6).join("\n") : ".");
+      return json({ ok: true, message: msg });
+    }
+
+    if (action === "sync_factures_clients") {
+      const { data: facs } = await admin.from("factures").select("*, lignes:factures_lignes(*)").eq("type", "facture").neq("statut", "annulee");
+      const { data: clients } = await admin.from("clients").select("id,dolibarr_id");
+      const cmap: Record<string, string> = {}; (clients ?? []).forEach((c: any) => { if (c.dolibarr_id) cmap[c.id] = c.dolibarr_id; });
+      let created = 0, validated = 0; const errors: string[] = [];
+      for (const f of facs ?? []) {
+        try {
+          if (f.dolibarr_id) continue;
+          const socid = cmap[f.client_id];
+          if (!socid) { errors.push(`${f.id}: client non synchronisé`); continue; }
+          const lignes = (f.lignes ?? []).sort((a: any, b: any) => (a.rang ?? 0) - (b.rang ?? 0))
+            .map((l: any) => ({ desc: l.designation, subprice: l.prix_unitaire, qty: l.quantite, tva_tx: 0 }));
+          const payload: any = { socid, type: "0", date: f.date_facture, ref_client: f.id, note_private: f.notes ?? `Facture ${f.id}`, lines: lignes };
+          const cr = await doli("POST", "/invoices", payload);
+          if (!cr.ok) { errors.push(`${f.id}: création ${cr.status} ${errDetail(cr.data)}`); continue; }
+          const invId = idOf(cr.data);
+          await admin.from("factures").update({ dolibarr_id: invId }).eq("id", f.id);
+          created++;
+          const val = await doli("POST", `/invoices/${invId}/validate`, {});
+          if (val.ok) validated++; else errors.push(`${f.id}: facture créée mais non validée (${val.status})`);
+        } catch (e) { errors.push(`${f.id}: ${String((e as Error)?.message ?? e)}`); }
+      }
+      const msg = `Factures clients : ${created} créée(s), ${validated} validée(s)` + (errors.length ? `, ${errors.length} à vérifier :\n` + errors.slice(0, 6).join("\n") : ".");
       return json({ ok: true, message: msg });
     }
 
