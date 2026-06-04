@@ -15,6 +15,7 @@ import {
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { KpiCard } from "@/components/KpiCard";
 import TransactionsResume from "@/components/TransactionsResume";
+import ClientTransactionWidget from "@/components/ClientTransactionWidget";
 import { formatXOF, formatDate } from "@/lib/format";
 import type { TypeTransaction } from "@/lib/database.types";
 
@@ -217,7 +218,8 @@ export default function CaissePage() {
         )}
       </Card>
 
-      <div className="mt-5">
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <ClientTransactionWidget />
         <TransactionsResume />
       </div>
 

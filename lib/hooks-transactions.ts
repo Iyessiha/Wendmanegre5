@@ -63,6 +63,16 @@ export async function enregistrerTransaction(input: {
   reference?: string;
   caisse_id?: string;
   user_id?: string;
+  client_id?: string;
+  // Champs distincts par type
+  telephone_dest?: string;  // ENVOI
+  nom_dest?: string;        // ENVOI
+  operateur_dest?: string;  // ENVOI inter-réseau
+  type_credit?: string;     // CREDIT: unites_om|cash|credit_tel
+  echeance?: string;        // CREDIT: date ISO
+  mode_paiement?: string;   // REMBOURSEMENT
+  expediteur_nom?: string;  // RECEPTION
+  expediteur_tel?: string;  // RECEPTION
 }): Promise<void> {
   const sb = getClient() as any;
   const { error } = await sb.from("transactions").insert({
@@ -77,6 +87,15 @@ export async function enregistrerTransaction(input: {
     reference: input.reference || null,
     caisse_id: input.caisse_id || null,
     user_id: input.user_id || null,
+    client_id: input.client_id || null,
+    telephone_dest: input.telephone_dest || null,
+    nom_dest: input.nom_dest || null,
+    operateur_dest: input.operateur_dest || null,
+    type_credit: input.type_credit || null,
+    echeance: input.echeance || null,
+    mode_paiement: input.mode_paiement || null,
+    expediteur_nom: input.expediteur_nom || null,
+    expediteur_tel: input.expediteur_tel || null,
     date_transaction: new Date().toISOString().slice(0, 10),
     statut: "effectuee",
   });

@@ -454,3 +454,48 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean }
 
   return { stats, loading };
 }
+
+// ── Recherche client live (autocomplete) ─────────────────────────────────────
+export interface ClientLight {
+  id: string; nom: string; telephone: string | null;
+  ville: string | null; plafond: number | null;
+}
+
+export function useClientSearch(query: string) {
+  const [results, setResults] = useState<ClientLight[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (query.trim().length < 2) { setResults([]); return; }
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      const q = query.trim();
+      const { data } = await (getClient() as any)
+        .from("clients")
+        .select("id,nom,telephone,ville,plafond")
+        .or(`nom.ilike.%${q}%,telephone.ilike.%${q}%`)
+        .eq("actif", true)
+        .order("nom").limit(8);
+      setResults(data ?? []);
+      setLoading(false);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [query]);
+  return { results, loading };
+}
+
+// Historique des transactions d'un client
+export function useHistoriqueClientTx(clientId: string | null, limit = 5) {
+  const [data, setData] = useState<any[]>([]);
+  const refetch = useCallback(async () => {
+    if (!clientId) { setData([]); return; }
+    const { data: rows } = await (getClient() as any)
+      .from("transactions")
+      .select("id,type,montant,frais,operateur,date_transaction,created_at")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false }).limit(limit);
+    setData(rows ?? []);
+  }, [clientId, limit]);
+  useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["transactions"], refetch, 600);
+  return { data, refetch };
+}

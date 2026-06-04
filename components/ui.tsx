@@ -59,7 +59,7 @@ export function Modal({
 }: {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: string | ReactNode;
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -115,12 +115,14 @@ export function Btn({
   variant = "primary",
   type = "button",
   className = "",
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: "primary" | "ghost" | "soft";
   type?: "button" | "submit";
   className?: string;
+  disabled?: boolean;
 }) {
   const base =
     "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98]";
@@ -130,7 +132,7 @@ export function Btn({
     soft: "bg-sand-200 text-ink hover:bg-sand-300",
   };
   return (
-    <button type={type} onClick={onClick} className={`${base} ${styles[variant]} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}>
       {children}
     </button>
   );
