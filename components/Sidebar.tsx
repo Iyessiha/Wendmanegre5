@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, Users, HandCoins, Wallet,
+  LayoutDashboard, Users, HandCoins,
   Package, Settings, LogOut, Store, Calculator, UserCog, FileText, ShieldCheck, Radio, ArrowLeftRight, Building2,
 } from "lucide-react";
 import { ENTREPRISE } from "@/lib/data";
@@ -16,8 +16,7 @@ const navAdmin = [
   { href: "/transactions", label: "Transactions",      icon: ArrowLeftRight  },
   { href: "/clients",      label: "Commerçants",       icon: Users           },
   { href: "/prets",        label: "Prêts & encours",   icon: HandCoins       },
-  { href: "/caisses",      label: "Caisses",            icon: Wallet          },
-  { href: "/comptes",      label: "Banques & Caisses",  icon: Building2       },
+  { href: "/comptes",      label: "Trésorerie",         icon: Building2       },
   { href: "/operateurs",   label: "Opérateurs",         icon: Radio           },
   { href: "/boutique",     label: "Boutique & stock",   icon: Package         },
   { href: "/facturation",  label: "Facturation",        icon: FileText        },
