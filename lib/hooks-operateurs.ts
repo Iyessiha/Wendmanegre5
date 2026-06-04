@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getClient } from "./supabase";
+import { useRealtimeRefetch } from "./realtime";
 
 export interface Operateur {
   id: string;
@@ -37,6 +38,7 @@ export function useOperateurs() {
     setLoading(false);
   }, []);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["operateurs","operateurs_mouvements"], refetch, 600);
   return { data, loading, refetch };
 }
 

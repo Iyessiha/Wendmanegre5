@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getClient } from "./supabase";
+import { useRealtimeRefetch } from "./realtime";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export type SourceCompte = "caisse" | "dolibarr";
@@ -63,6 +64,7 @@ export function useComptesUnifies() {
     setLoading(false);
   }, []);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["caisses","comptes_bancaires","mouvements_caisse","mouvements_comptes_bancaires"], refetch, 600);
   return { data, loading, refetch };
 }
 
@@ -85,6 +87,7 @@ export function useHistoriqueCompte(uid: string) {
     } catch { setData([]); }
   }, [uid]);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["mouvements_caisse","mouvements_comptes_bancaires"], refetch, 500);
   return { data, refetch };
 }
 

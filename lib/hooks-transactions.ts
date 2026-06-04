@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getClient } from "./supabase";
+import { useRealtimeRefetch } from "./realtime";
 
 export type TypeTransaction = "DEPOT" | "RETRAIT" | "ENVOI" | "RECEPTION" | "CREDIT" | "REMBOURSEMENT";
 
@@ -47,6 +48,7 @@ export function useTransactions(filter?: { type?: string; operateur?: string; li
     setLoading(false);
   }, [filter?.type, filter?.operateur, filter?.limit]);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["transactions","mouvements_caisse"], refetch, 600);
   return { data, loading, refetch };
 }
 

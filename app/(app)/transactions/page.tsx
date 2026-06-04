@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Plus, Search } from "lucide-react";
+import {
+  ArrowLeftRight, Plus, Search,
+  ArrowDownCircle, ArrowUpCircle, Send, HandCoins, Wallet, Download,
+} from "lucide-react";
 import { useTransactions, enregistrerTransaction, resumeJour, TYPES_TRANSACTION, labelType, type TypeTransaction } from "@/lib/hooks-transactions";
 import { useOperateurs } from "@/lib/hooks-operateurs";
 import { useCaisses } from "@/lib/hooks";
@@ -9,6 +12,19 @@ import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { getDemoSession } from "@/lib/demo-session";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF, formatDate } from "@/lib/format";
+
+// ── 6 boutons d'action rapide ────────────────────────────────────────────────
+const TX_ACTIONS: {
+  type: TypeTransaction; label: string; desc: string;
+  icon: React.ElementType; color: string; bg: string; border: string;
+}[] = [
+  { type: "DEPOT",         label: "Dépôt Mobile Money",   desc: "Client dépose du cash → reçoit de l'eMonnaie",   icon: ArrowDownCircle, color: "text-leaf-600",   bg: "bg-leaf-50",    border: "border-leaf-200"  },
+  { type: "RETRAIT",       label: "Retrait Mobile Money",  desc: "Client retire du cash de son compte mobile",      icon: ArrowUpCircle,   color: "text-clay-700",  bg: "bg-clay-50",    border: "border-clay-200"  },
+  { type: "ENVOI",         label: "Envoi d'argent",        desc: "Transfert vers un autre numéro",                  icon: Send,            color: "text-purple-600",bg: "bg-purple-50",  border: "border-purple-200"},
+  { type: "CREDIT",        label: "Octroyer un crédit",    desc: "Avancer des unités ou du cash à crédit",          icon: HandCoins,       color: "text-amber-700", bg: "bg-amber-50",   border: "border-amber-200" },
+  { type: "REMBOURSEMENT", label: "Remboursement crédit",  desc: "Encaisser le retour d'un crédit",                 icon: Wallet,          color: "text-teal-600",  bg: "bg-teal-50",    border: "border-teal-200"  },
+  { type: "RECEPTION",     label: "Réception transfert",   desc: "Client reçoit un transfert entrant",              icon: Download,        color: "text-blue-600",  bg: "bg-blue-50",    border: "border-blue-200"  },
+];
 
 const TYPE_BADGE: Record<string, string> = {
   DEPOT: "bg-leaf-100 text-leaf-600", RETRAIT: "bg-clay/15 text-clay-700", ENVOI: "bg-blue-100 text-blue-700",
@@ -39,16 +55,27 @@ export default function TransactionsPage() {
     (t.reference ?? "").toLowerCase().includes(q.toLowerCase())
   ), [transactions, q]);
 
+  // ── Modal ──────────────────────────────────────────────────────────────────
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [form, setForm] = useState({ type: "DEPOT" as TypeTransaction, operateur: "", montant: "", frais: "", nom_client: "", telephone_client: "", reference: "", caisse_id: "" });
+  const [form, setForm] = useState({
+    type: "DEPOT" as TypeTransaction, operateur: "", montant: "", frais: "",
+    nom_client: "", telephone_client: "", reference: "", caisse_id: "",
+  });
 
-  // Caisse par défaut du caissier connecté
+  // Ouvrir le modal avec un type pré-sélectionné
+  function openWithType(t: TypeTransaction) {
+    setErr(null);
+    setForm(f => ({ ...f, type: t }));
+    setOpen(true);
+  }
+
+  // Caisse par défaut
   useEffect(() => {
     if (!open) return;
     const maCaisse = caisses.find((c: any) => c.assignee_id === userId);
-    setForm(f => ({ ...f, caisse_id: f.caisse_id || maCaisse?.id || caisses[0]?.id || "" }));
+    setForm(f => ({ ...f, caisse_id: f.caisse_id || (maCaisse as any)?.id || (caisses[0] as any)?.id || "" }));
   }, [open, caisses, userId]);
 
   // Commission auto selon l'opérateur
@@ -88,14 +115,19 @@ export default function TransactionsPage() {
       <PageHeader
         title="Transactions"
         subtitle="Dépôts, retraits, transferts et crédits"
-        action={<Btn onClick={() => { setErr(null); setOpen(true); }}><Plus size={16} /> <span className="hidden sm:inline">Nouvelle transaction</span></Btn>}
+        action={
+          <Btn variant="ghost" onClick={() => { setErr(null); setOpen(true); }}>
+            <Plus size={15} /> Autre
+          </Btn>
+        }
       />
 
+      {/* KPIs */}
       <div className="mb-4 grid grid-cols-3 gap-3">
         {[
           { l: "Transactions aujourd'hui", v: String(resume.nombre) },
-          { l: "Volume du jour", v: formatXOF(resume.volume) },
-          { l: "Commissions du jour", v: formatXOF(resume.commissions), accent: true },
+          { l: "Volume du jour",           v: formatXOF(resume.volume) },
+          { l: "Commissions du jour",      v: formatXOF(resume.commissions), accent: true },
         ].map((s, i) => (
           <Card key={i} className="p-4">
             <div className="text-[12px] text-ink-400">{s.l}</div>
@@ -104,10 +136,36 @@ export default function TransactionsPage() {
         ))}
       </div>
 
+      {/* ── 6 boutons d'action rapide ─────────────────────────────────────── */}
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {TX_ACTIONS.map(a => {
+          const Icon = a.icon;
+          return (
+            <button
+              key={a.type}
+              onClick={() => openWithType(a.type)}
+              className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all tap
+                hover:shadow-md active:scale-[0.98] ${a.bg} ${a.border}`}
+            >
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/80 shadow-sm ${a.color}`}>
+                <Icon size={22} />
+              </div>
+              <div className="min-w-0">
+                <div className={`text-[13px] font-bold leading-tight ${a.color}`}>{a.label}</div>
+                <div className="mt-0.5 text-[11px] leading-tight text-ink-500 line-clamp-2">{a.desc}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filtres + recherche */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-sand-200 bg-white/70 px-3.5 py-2.5 shadow-card">
           <Search size={17} className="text-ink-400" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher client, téléphone, référence…" className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400" />
+          <input value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Rechercher client, téléphone, référence…"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400" />
         </div>
         <select className={inputCls + " w-auto"} value={type} onChange={e => setType(e.target.value)}>
           <option value="tous">Tous les types</option>
@@ -119,6 +177,7 @@ export default function TransactionsPage() {
         </select>
       </div>
 
+      {/* Tableau */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -148,36 +207,41 @@ export default function TransactionsPage() {
                   <td className="px-4 py-3 text-ink-500 text-[13px]">{caisseNom(t.caisse_id)}</td>
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-400">Aucune transaction.</td></tr>}
+              {rows.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-400">Aucune transaction. Utilisez les boutons ci-dessus pour en enregistrer une.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Nouvelle transaction">
+      {/* Modal nouvelle transaction */}
+      <Modal open={open} onClose={() => setOpen(false)} title={
+        TX_ACTIONS.find(a => a.type === form.type)?.label ?? "Nouvelle transaction"
+      }>
+        {/* Sélecteur de type visuel dans le modal */}
+        <div className="mb-3 grid grid-cols-3 gap-1.5">
+          {TX_ACTIONS.map(a => {
+            const Icon = a.icon;
+            const sel = form.type === a.type;
+            return (
+              <button key={a.type} onClick={() => setForm(f => ({ ...f, type: a.type }))}
+                className={`flex flex-col items-center gap-1 rounded-xl border py-2.5 text-[11px] font-medium transition-all
+                  ${sel ? `${a.bg} ${a.border} ${a.color} ring-2 ring-current/20` : "border-sand-200 text-ink-400 hover:bg-sand-50"}`}>
+                <Icon size={16} />
+                <span className="text-center leading-tight">{a.label.split(" ").slice(0, 2).join(" ")}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Type">
-            <select className={inputCls} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as TypeTransaction }))}>
-              {TYPES_TRANSACTION.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
-            </select>
-          </Field>
           <Field label="Opérateur">
             <select className={inputCls} value={form.operateur} onChange={e => onMontantOrOp({ operateur: e.target.value })}>
               <option value="">— Aucun —</option>
               {operateurs.map(o => <option key={o.id} value={o.id}>{o.nom}</option>)}
             </select>
           </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Montant (XOF)"><input className={inputCls + " num"} type="number" value={form.montant} onChange={e => onMontantOrOp({ montant: e.target.value })} /></Field>
-          <Field label="Commission (XOF)"><input className={inputCls + " num"} type="number" value={form.frais} onChange={e => setForm(f => ({ ...f, frais: e.target.value }))} /></Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Nom client (optionnel)"><input className={inputCls} value={form.nom_client} onChange={e => setForm(f => ({ ...f, nom_client: e.target.value }))} /></Field>
-          <Field label="Téléphone (optionnel)"><input className={inputCls + " num"} value={form.telephone_client} onChange={e => setForm(f => ({ ...f, telephone_client: e.target.value }))} /></Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Référence (optionnel)"><input className={inputCls} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} /></Field>
           <Field label="Caisse">
             <select className={inputCls} value={form.caisse_id} onChange={e => setForm(f => ({ ...f, caisse_id: e.target.value }))}>
               <option value="">— Choisir —</option>
@@ -185,7 +249,24 @@ export default function TransactionsPage() {
             </select>
           </Field>
         </div>
-        <p className="text-[11px] text-ink-400">La caisse est créditée/débitée automatiquement (commission incluse) et la flotte de l'opérateur ajustée.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Montant (XOF)">
+            <input className={inputCls + " num"} type="number" value={form.montant}
+              onChange={e => onMontantOrOp({ montant: e.target.value })} placeholder="0" />
+          </Field>
+          <Field label="Commission (XOF)">
+            <input className={inputCls + " num"} type="number" value={form.frais}
+              onChange={e => setForm(f => ({ ...f, frais: e.target.value }))} placeholder="auto" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Nom client"><input className={inputCls} value={form.nom_client} onChange={e => setForm(f => ({ ...f, nom_client: e.target.value }))} /></Field>
+          <Field label="Téléphone"><input className={inputCls + " num"} value={form.telephone_client} onChange={e => setForm(f => ({ ...f, telephone_client: e.target.value }))} /></Field>
+        </div>
+        <Field label="Référence (optionnel)">
+          <input className={inputCls} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />
+        </Field>
+        <p className="text-[11px] text-ink-400">La caisse et la flotte opérateur sont mises à jour automatiquement.</p>
         {err && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{err}</p>}
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpen(false)}>Annuler</Btn>

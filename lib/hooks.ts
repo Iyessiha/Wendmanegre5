@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getClient } from "./supabase";
+import { useRealtimeRefetch } from "./realtime";
 import type {
   Client, Caisse, PretEncours, Remboursement,
   MouvementCaisse, Produit, Profile,
@@ -26,6 +27,7 @@ export function useClients(): UseResult<Client[]> {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useRealtimeRefetch(["clients"], fetch, 800);
   return { data, loading, error, refetch: fetch };
 }
 
@@ -59,6 +61,7 @@ export function usePrets(filter?: { statut?: string; clientId?: string }): UseRe
   }, [filter?.statut, filter?.clientId]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useRealtimeRefetch(["prets"], fetch, 800);
   return { data, loading, error, refetch: fetch };
 }
 
@@ -142,6 +145,7 @@ export function useRemboursements(pretId?: string): UseResult<Remboursement[]> {
   }, [pretId]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useRealtimeRefetch(["remboursements"], fetch, 800);
   return { data, loading, error, refetch: fetch };
 }
 
@@ -193,6 +197,7 @@ export function useCaisses(): UseResult<(Caisse & { assignee?: Profile })[]> {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useRealtimeRefetch(["caisses","mouvements_caisse"], fetch, 600);
   return { data, loading, error, refetch: fetch };
 }
 
@@ -259,6 +264,7 @@ export function useMouvements(caisseId?: string): UseResult<MouvementCaisse[]> {
   }, [caisseId]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useRealtimeRefetch(["mouvements_caisse"], fetch, 500);
   return { data, loading, error, refetch: fetch };
 }
 
@@ -279,6 +285,7 @@ export function useProduits(): UseResult<Produit[]> {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useRealtimeRefetch(["produits"], fetch, 800);
   return { data, loading, error, refetch: fetch };
 }
 
@@ -388,6 +395,62 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean }
     }
     load();
   }, []);
+
+  useRealtimeRefetch(
+    ["prets","remboursements","caisses","transactions","factures",
+     "factures_paiements","comptes_bancaires","operateurs","clients"],
+    () => {
+      // re-déclenche le useEffect en forçant un rechargement
+      const sb = getClient() as any;
+      // Réexécute load() via une fonction locale
+      (async () => {
+        const [pretsRes, caissesRes, clientsRes, rembRes, facturesRes, comptesRes] = await Promise.all([
+          sb.from("v_prets_encours").select("*"),
+          sb.from("caisses").select("solde").eq("actif", true),
+          sb.from("clients").select("*", { count: "exact", head: true }).eq("actif", true),
+          sb.from("remboursements").select("montant,pret_id,date_remb,prets(client_id,clients(nom))").order("date_remb", { ascending: false }).limit(6),
+          sb.from("v_factures").select("client_ville,reste_a_payer,montant_total,total_paye,statut").neq("statut","annulee"),
+          sb.from("comptes_bancaires").select("type,solde_dolibarr,actif").eq("actif", true),
+        ]);
+        const prets: PretEncours[] = (pretsRes.data ?? []) as PretEncours[];
+        const actifs = prets.filter(p => p.statut !== "rembourse" && p.statut !== "annule");
+        const encoursPrets = actifs.reduce((s, p) => s + (p.reste_a_payer ?? 0), 0);
+        const tresorerie = (caissesRes.data ?? []).reduce((s: number, c: any) => s + c.solde, 0);
+        const comptes = (comptesRes.data ?? []) as any[];
+        const tresorerieBanque  = comptes.filter(c=>c.type==="banque").reduce((s:number,c:any)=>s+Number(c.solde_dolibarr),0);
+        const tresorerieEspeces = comptes.filter(c=>c.type==="caisse_especes").reduce((s:number,c:any)=>s+Number(c.solde_dolibarr),0);
+        const flotteMobile      = comptes.filter(c=>c.type==="mobile_money").reduce((s:number,c:any)=>s+Number(c.solde_dolibarr),0);
+        const totalOctroye = prets.reduce((s, p) => s + p.montant, 0);
+        const totalRemb = prets.reduce((s, p) => s + p.total_rembourse, 0);
+        const enRetard = actifs.filter(p => p.jours_retard > 0).slice(0, 5);
+        const factures = (facturesRes.data ?? []) as any[];
+        const facturesImp = factures.filter(f => Number(f.reste_a_payer ?? 0) > 0);
+        const encoursFactures = facturesImp.reduce((s: number, f: any) => s + Number(f.reste_a_payer), 0);
+        const encours = encoursPrets + encoursFactures;
+        const totalFactures = factures.reduce((s: number, f: any) => s + Number(f.montant_total), 0);
+        const totalFacturesPaye = factures.reduce((s: number, f: any) => s + Number(f.total_paye ?? 0), 0);
+        const tauxRecouvrement = (totalOctroye + totalFactures) > 0 ? ((totalRemb + totalFacturesPaye) / (totalOctroye + totalFactures)) * 100 : 0;
+        const parVille: Record<string, number> = {};
+        actifs.forEach(p => { const v = (p.client_ville || "N/C").toUpperCase(); parVille[v] = (parVille[v] ?? 0) + (p.reste_a_payer ?? 0); });
+        facturesImp.forEach((f: any) => { const v = (f.client_ville || "N/C").toUpperCase(); parVille[v] = (parVille[v] ?? 0) + Number(f.reste_a_payer); });
+        const parType: Record<string, number> = {};
+        actifs.forEach(p => { parType[p.type_operation] = (parType[p.type_operation] ?? 0) + (p.reste_a_payer ?? 0); });
+        const activite = [
+          ...prets.slice(0,6).map(p => ({ type:"octroi" as const, ref:p.id, client:p.client_nom, montant:p.montant, date:p.date_octroi })),
+          ...(rembRes.data ?? []).map((r:any) => ({ type:"remboursement" as const, ref:r.pret_id, client:r.prets?.clients?.nom??"—", montant:r.montant, date:r.date_remb })),
+        ].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+        setStats({
+          encours, encoursPrets, encoursFactures, tresorerie, tresorerieBanque, tresorerieEspeces, flotteMobile,
+          nbCommerçants: clientsRes.count??0, nbImpayes: actifs.length+facturesImp.length,
+          nbImpayesPrets: actifs.length, nbImpayesFactures: facturesImp.length, tauxRecouvrement, enRetard,
+          parVille: Object.entries(parVille).map(([ville,montant])=>({ville,montant})).sort((a,b)=>b.montant-a.montant).slice(0,8),
+          parType: Object.entries(parType).map(([type,montant])=>({type,montant})),
+          activiteRecente: activite,
+        });
+      })();
+    },
+    1200,
+  );
 
   return { stats, loading };
 }

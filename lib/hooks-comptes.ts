@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getClient } from "./supabase";
+import { useRealtimeRefetch } from "./realtime";
 
 export type TypeCompte = "banque" | "caisse_especes" | "mobile_money" | "autre";
 
@@ -61,6 +62,7 @@ export function useComptesBancaires() {
     setLoading(false);
   }, []);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["comptes_bancaires"], refetch, 600);
   return { data, loading, refetch };
 }
 

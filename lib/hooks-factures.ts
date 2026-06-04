@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getClient } from "./supabase";
+import { useRealtimeRefetch } from "./realtime";
 
 export type TypeDoc = "commande" | "facture";
 export type StatutDoc = "brouillon" | "validee" | "payee" | "annulee";
@@ -59,6 +60,7 @@ export function useFactures(filter?: { type?: TypeDoc; statut?: string }) {
     setLoading(false);
   }, [filter?.type, filter?.statut]);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["factures","factures_paiements","factures_lignes"], refetch, 700);
   return { data, loading, refetch };
 }
 
@@ -235,5 +237,6 @@ export function useImpayes() {
     setLoading(false);
   }, []);
   useEffect(() => { refetch(); }, [refetch]);
+  useRealtimeRefetch(["factures","factures_paiements"], refetch, 700);
   return { data, loading, refetch };
 }
