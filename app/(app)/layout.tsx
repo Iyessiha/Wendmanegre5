@@ -85,13 +85,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <PermissionsProvider userId={profile.id} role={profile.role}>
-      <Sidebar profile={profile} />
+      <Sidebar role={profile.role} />
       <main className="grain-bg min-h-screen lg:pl-64">
         <div className="has-mobile-nav mx-auto max-w-[1280px] px-4 py-5 sm:px-8 sm:py-8">
           {children}
         </div>
       </main>
-      <MobileNav profile={profile} />
+      <MobileNav role={profile.role} />
     </PermissionsProvider>
   );
 }

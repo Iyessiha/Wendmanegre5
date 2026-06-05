@@ -523,6 +523,16 @@ export default function ParametresPage() {
             <Btn onClick={() => runDoli("facturesClients", synchroniserFacturesClients)} className={doliBusy === "facturesClients" ? "opacity-50" : ""}>
               <Receipt size={15} /> {doliBusy === "facturesClients" ? "Synchronisation…" : "Factures clients"}
             </Btn>
+            <Btn onClick={async () => {
+              try {
+                const sb = (await import("@/lib/supabase")).getClient() as any;
+                const { data, error } = await sb.functions.invoke("sync-users-dolibarr", { method:"POST" });
+                if (error) throw error;
+                setDoliMsg(`Utilisateurs Dolibarr : ${data.created} créés · ${data.updated} mis à jour · ${data.errors} erreurs (total ${data.total})`);
+              } catch(e:any){ setDoliErr(e?.message??"Erreur"); }
+            }} className={doliBusy?"opacity-50":""}>
+              <UserPlus size={15}/> Synchroniser les utilisateurs Dolibarr
+            </Btn>
           </div>
 
           {doliMsg && (
