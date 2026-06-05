@@ -4,13 +4,15 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import TransactionsResume from "@/components/TransactionsResume";
 import FacturesImpayes from "@/components/FacturesImpayes";
+import ClientTransactionWidget from "@/components/ClientTransactionWidget";
 import {
   HandCoins, Wallet, Users, CheckCircle,
   AlertTriangle, Clock,
-  Store, Plane, ShieldCheck, Lock,
+  Store, Plane, ShieldCheck, Lock, Smartphone,
 } from "lucide-react";
 import { usePrets, useCaisses, useClients } from "@/lib/hooks";
 import { useProfiles } from "@/lib/hooks2";
+import { useTresorerie } from "@/lib/hooks-comptes";
 import { usePermissions } from "@/lib/permissions";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { KpiCard } from "@/components/KpiCard";
@@ -24,6 +26,7 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
   const { data: clients } = useClients();
   const { data: profiles } = useProfiles();
   const { can } = usePermissions();
+  const tresorerie = useTresorerie();
 
   // Caissiers de son agence + caisses rattachées
   const mesCaissiers = profiles.filter(u => u.agence === profile.agence && u.role === "caissier");
@@ -67,10 +70,22 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
       {/* KPIs de l'agence */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard label="Encours total"     value={formatXOF(stats.encours)}  sub={`${stats.nbActifs} créances`}           icon={<HandCoins size={18}/>} accent="clay" />
-        <KpiCard label="Trésorerie agence" value={formatXOF(stats.tresor)}   sub={`${mesCaisses.length} caisses`}         icon={<Wallet size={18}/>}    accent="leaf" />
+        <KpiCard label="Trésorerie"        value={formatXOF(tresorerie.totalBanque + tresorerie.totalEspeces)} sub={`banques + espèces · Dolibarr`} icon={<Wallet size={18}/>} accent="leaf" />
         <KpiCard label="Caissiers actifs"  value={String(mesCaissiers.length)} sub={`agence ${profile.agence}`}          icon={<Users size={18}/>}     accent="ink"  />
         <KpiCard label="En retard"         value={String(stats.enRetard.length)} sub="prêts au-delà de l'échéance"       icon={<AlertTriangle size={18}/>} accent="ember" />
       </div>
+
+      {/* Bandeau flotte Orange Money */}
+      {tresorerie.totalMobile > 0 && (
+        <Link href="/comptes" className="mt-3 flex items-center justify-between rounded-xl bg-orange-50 border border-orange-200 px-4 py-2.5 text-[13px] hover:bg-orange-100">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-100 text-orange-600"><Smartphone size={14}/></span>
+            <span className="font-medium text-orange-800">Flotte Orange Money</span>
+            <span className="num font-bold text-orange-700">{formatXOF(tresorerie.totalMobile)}</span>
+          </div>
+          <span className="text-orange-500">Voir les comptes →</span>
+        </Link>
+      )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
 
@@ -221,12 +236,12 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
       <Card className="mt-5 p-5">
         <h3 className="display mb-4 text-base font-bold text-ink">Mes actions rapides</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
-          <QuickAction href="/clients" icon={Users}  label="Commerçants" sub="Voir le réseau"    allowed={can("clients_voir")} />
-          <QuickAction href="/prets"   icon={HandCoins} label="Prêts"    sub="Gérer l'encours"  allowed={can("prets_voir")} />
-          <QuickAction href="/caisses" icon={Wallet} label="Caisses"     sub="Alimenter"         allowed={can("caisses_voir")} />
-          <QuickAction href="/boutique"icon={Store}  label="Boutique"    sub="Stock & ventes"   allowed={can("stock_voir")} />
-          <QuickAction href="/grh"     icon={Plane}  label="Congés"      sub="Approuver"         allowed={can("conges_approuver")} />
-          <QuickAction href="/boutique?tab=commandes" icon={Clock} label="Commandes" sub="Réceptionner" allowed={can("commandes_valider")} />
+          <QuickAction href="/clients"  icon={Users}    label="Commerçants" sub="Voir le réseau"   allowed={can("clients_voir")} />
+          <QuickAction href="/prets"    icon={HandCoins} label="Prêts"      sub="Gérer l'encours" allowed={can("prets_voir")} />
+          <QuickAction href="/comptes"  icon={Wallet}   label="Trésorerie"  sub="Banques & Caisses" allowed={can("caisses_voir")} />
+          <QuickAction href="/boutique" icon={Store}    label="Boutique"    sub="Stock & ventes"  allowed={can("stock_voir")} />
+          <QuickAction href="/grh"      icon={Plane}    label="Congés"      sub="Approuver"        allowed={can("conges_approuver")} />
+          <QuickAction href="/commandes" icon={Clock}   label="Commandes"   sub="Réceptionner"     allowed={can("commandes_valider")} />
         </div>
       </Card>
 
@@ -249,7 +264,8 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
         </div>
       </Card>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <div className="mt-5 grid gap-5 lg:grid-cols-3">
+        <ClientTransactionWidget />
         <TransactionsResume />
         <FacturesImpayes />
       </div>

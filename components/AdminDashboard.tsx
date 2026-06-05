@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import TransactionsResume from "@/components/TransactionsResume";
 import FacturesImpayes from "@/components/FacturesImpayes";
+import ClientTransactionWidget from "@/components/ClientTransactionWidget";
 import {
   HandCoins, Users, Wallet, TrendingUp, Smartphone,
   AlertTriangle, ArrowUpRight, ArrowDownRight, Building2, Shield,
@@ -173,7 +174,7 @@ export default function AdminDashboard() {
             <Building2 size={17} className="text-clay" />
             <h3 className="display text-lg font-bold text-ink">Caisses — toutes agences</h3>
           </div>
-          <Link href="/caisses" className="text-[13px] font-medium text-clay hover:underline">Gérer →</Link>
+          <Link href="/comptes" className="text-[13px] font-medium text-clay hover:underline">Gérer →</Link>
         </div>
         <div className="grid grid-cols-2 divide-x divide-sand-100 sm:grid-cols-4">
           {caisses.map(c => (
@@ -186,7 +187,8 @@ export default function AdminDashboard() {
         </div>
       </Card>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <div className="mt-5 grid gap-5 lg:grid-cols-3">
+        <ClientTransactionWidget />
         <TransactionsResume />
         <FacturesImpayes />
       </div>
