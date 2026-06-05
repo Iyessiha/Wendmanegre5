@@ -93,7 +93,7 @@ function FormDepot({ operateurs, caisses, userId, onSuccess }:any) {
   return (
     <div className="space-y-3">
       <ClientSearch value={client} onSelect={onSelectClient} onClear={()=>setClient(null)} label="Commerçant / Client déposant"/>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Opérateur Mobile Money">
           <select className={inputCls} value={f.operateur} onChange={e=>setF(x=>({...x,operateur:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -104,11 +104,11 @@ function FormDepot({ operateurs, caisses, userId, onSuccess }:any) {
           <input className={inputCls+" num"} value={f.telephone} placeholder="226XXXXXXXX" onChange={e=>setF(x=>({...x,telephone:e.target.value}))}/>
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Montant déposé (XOF)"><input className={inputCls+" num"} type="number" value={f.montant} placeholder="0" onChange={e=>setF(x=>({...x,montant:e.target.value}))}/></Field>
         <Field label="Commission dealer (XOF)"><input className={inputCls+" num"} type="number" value={f.frais} placeholder="auto" onChange={e=>setF(x=>({...x,frais:e.target.value}))}/></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Caisse">
           <select className={inputCls} value={f.caisse_id} onChange={e=>setF(x=>({...x,caisse_id:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -142,7 +142,7 @@ function FormRetrait({ operateurs, caisses, userId, onSuccess }:any) {
   return (
     <div className="space-y-3">
       <ClientSearch value={client} onSelect={onSel} onClear={()=>setClient(null)} label="Client effectuant le retrait"/>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Opérateur">
           <select className={inputCls} value={f.operateur} onChange={e=>setF(x=>({...x,operateur:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -151,11 +151,11 @@ function FormRetrait({ operateurs, caisses, userId, onSuccess }:any) {
         </Field>
         <Field label="N° Mobile Money"><input className={inputCls+" num"} value={f.telephone} placeholder="226XXXXXXXX" onChange={e=>setF(x=>({...x,telephone:e.target.value}))}/></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Montant retiré (XOF)"><input className={inputCls+" num"} type="number" value={f.montant} placeholder="0" onChange={e=>setF(x=>({...x,montant:e.target.value}))}/></Field>
         <Field label="Frais retrait (XOF)"><input className={inputCls+" num"} type="number" value={f.frais} placeholder="auto" onChange={e=>setF(x=>({...x,frais:e.target.value}))}/></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Caisse">
           <select className={inputCls} value={f.caisse_id} onChange={e=>setF(x=>({...x,caisse_id:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -196,7 +196,7 @@ function FormEnvoi({ operateurs, caisses, userId, onSuccess }:any) {
           <Field label="N° téléphone destinataire"><input className={inputCls+" num"} value={f.tel_dest} onChange={e=>setF(x=>({...x,tel_dest:e.target.value}))} placeholder="226XXXXXXXX"/></Field>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Opérateur source">
           <select className={inputCls} value={f.operateur_src} onChange={e=>setF(x=>({...x,operateur_src:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -210,7 +210,7 @@ function FormEnvoi({ operateurs, caisses, userId, onSuccess }:any) {
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Montant (XOF)"><input className={inputCls+" num"} type="number" value={f.montant} onChange={e=>setF(x=>({...x,montant:e.target.value}))} placeholder="0"/></Field>
         <Field label="Frais envoi (XOF)"><input className={inputCls+" num"} type="number" value={f.frais} onChange={e=>setF(x=>({...x,frais:e.target.value}))} placeholder="auto"/></Field>
         <Field label="Référence"><input className={inputCls} value={f.reference} onChange={e=>setF(x=>({...x,reference:e.target.value}))}/></Field>
@@ -246,7 +246,7 @@ function FormCredit({ operateurs, caisses, userId, onSuccess }:any) {
         <div><div className="font-semibold text-ink">{client.nom}</div><div className="text-ink-500">{client.telephone} · {client.ville}</div></div>
         {client.plafond&&<div className="ml-auto text-right"><div className="text-[10px] text-ink-400">Plafond</div><div className="num font-bold text-amber-700">{formatXOF(client.plafond)}</div></div>}
       </div>}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Type de crédit">
           <select className={inputCls} value={f.type_credit} onChange={e=>setF(x=>({...x,type_credit:e.target.value}))}>
             <option value="unites_om">Unités Orange Money</option>
@@ -262,12 +262,12 @@ function FormCredit({ operateurs, caisses, userId, onSuccess }:any) {
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Montant / Unités (XOF)"><input className={inputCls+" num"} type="number" value={f.montant} onChange={e=>setF(x=>({...x,montant:e.target.value}))} placeholder="0"/></Field>
         <Field label="Commission (XOF)"><input className={inputCls+" num"} type="number" value={f.frais} onChange={e=>setF(x=>({...x,frais:e.target.value}))} placeholder="0"/></Field>
         <Field label="Date d'échéance"><input className={inputCls} type="date" value={f.echeance} onChange={e=>setF(x=>({...x,echeance:e.target.value}))}/></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Caisse">
           <select className={inputCls} value={f.caisse_id} onChange={e=>setF(x=>({...x,caisse_id:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -300,7 +300,7 @@ function FormRemboursement({ operateurs, caisses, userId, onSuccess }:any) {
   return (
     <div className="space-y-3">
       <ClientSearch value={client} onSelect={c=>setClient(c)} onClear={()=>setClient(null)} label="Commerçant qui rembourse (obligatoire)"/>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Mode de remboursement">
           <select className={inputCls} value={f.mode} onChange={e=>setF(x=>({...x,mode:e.target.value}))}>
             <option value="cash">Espèces (cash)</option>
@@ -317,7 +317,7 @@ function FormRemboursement({ operateurs, caisses, userId, onSuccess }:any) {
           </Field>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Montant remboursé (XOF)"><input className={inputCls+" num"} type="number" value={f.montant} onChange={e=>setF(x=>({...x,montant:e.target.value}))} placeholder="0"/></Field>
         <Field label="Référence crédit"><input className={inputCls} value={f.reference} onChange={e=>setF(x=>({...x,reference:e.target.value}))} placeholder="Optionnel"/></Field>
         <Field label="Caisse">
@@ -359,7 +359,7 @@ function FormReception({ operateurs, caisses, userId, onSuccess }:any) {
           <Field label="N° téléphone expéditeur"><input className={inputCls+" num"} value={f.expediteur_tel} onChange={e=>setF(x=>({...x,expediteur_tel:e.target.value}))} placeholder="226XXXXXXXX"/></Field>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Opérateur (obligatoire)">
           <select className={inputCls} value={f.operateur} onChange={e=>setF(x=>({...x,operateur:e.target.value}))}>
             <option value="">— Choisir —</option>
@@ -368,7 +368,7 @@ function FormReception({ operateurs, caisses, userId, onSuccess }:any) {
         </Field>
         <Field label="Référence du transfert"><input className={inputCls} value={f.reference} onChange={e=>setF(x=>({...x,reference:e.target.value}))} placeholder="Obligatoire"/></Field>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Montant reçu (XOF)"><input className={inputCls+" num"} type="number" value={f.montant} onChange={e=>setF(x=>({...x,montant:e.target.value}))} placeholder="0"/></Field>
         <Field label="Commission (XOF)"><input className={inputCls+" num"} type="number" value={f.frais} onChange={e=>setF(x=>({...x,frais:e.target.value}))} placeholder="auto"/></Field>
         <Field label="Caisse">
@@ -426,7 +426,7 @@ export default function TransactionsPage() {
       <PageHeader title="Transactions" subtitle="Dépôts, retraits, transferts et crédits"/>
 
       {/* KPIs */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { l:"Transactions aujourd'hui", v:String(resume.nombre) },
           { l:"Volume du jour", v:formatXOF(resume.volume) },
@@ -440,7 +440,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* 6 boutons action */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3">
         {TX_ACTIONS.map(a=>{
           const Icon=a.icon;
           return(
@@ -481,7 +481,7 @@ export default function TransactionsPage() {
 
       {/* Tableau */}
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-sand-200 text-left text-[12px] uppercase tracking-wide text-ink-400">

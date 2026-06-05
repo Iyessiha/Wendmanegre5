@@ -106,7 +106,7 @@ export default function MargesPage() {
       </div>
 
       {/* KPIs */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {[
           { l:"Revenus totaux",    v:kpiPeriode.revenus,     cls:"text-leaf-600",  sub:`${kpiPeriode.nbTx} transactions` },
           { l:"Com. Mobile Money", v:kpiPeriode.commissions, cls:"text-orange-600",sub:"Frais encaissés" },
@@ -166,7 +166,7 @@ export default function MargesPage() {
           <h3 className="text-[14px] font-bold text-ink">Charges — {periodeFiltre}</h3>
           <Btn onClick={()=>setOpenCharge(true)} variant="soft"><Plus size={13}/> Ajouter</Btn>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase text-ink-400 bg-sand-50">
@@ -197,7 +197,7 @@ export default function MargesPage() {
       </Card>
 
       <Modal open={openCharge} onClose={()=>setOpenCharge(false)} title="Ajouter une charge">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Libellé"><input className={inputCls} value={cf.libelle} onChange={e=>setCf(f=>({...f,libelle:e.target.value}))} placeholder="Ex: Loyer bureau"/></Field>
           <Field label="Catégorie">
             <select className={inputCls} value={cf.categorie} onChange={e=>setCf(f=>({...f,categorie:e.target.value}))}>
@@ -205,7 +205,7 @@ export default function MargesPage() {
             </select>
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Montant (FCFA)"><input className={inputCls+" num"} type="number" value={cf.montant} onChange={e=>setCf(f=>({...f,montant:e.target.value}))}/></Field>
           <Field label="Date"><input className={inputCls} type="date" value={cf.date_charge} onChange={e=>setCf(f=>({...f,date_charge:e.target.value}))}/></Field>
         </div>

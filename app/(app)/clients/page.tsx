@@ -160,7 +160,7 @@ export default function ClientsPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { l: "Commerçants", v: String(stats.total) },
           { l: "Actifs", v: String(stats.actifs) },
@@ -226,7 +226,7 @@ export default function ClientsPage() {
       </Card>
 
       <Modal open={openNew} onClose={() => setOpenNew(false)} title={editId ? `Modifier — ${form.nom}` : "Nouveau commerçant"}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Nom complet">
             <input className={inputCls} value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} placeholder="OUEDRAOGO Boukary" />
           </Field>
@@ -234,7 +234,7 @@ export default function ClientsPage() {
             <input className={inputCls} value={form.nom_alternatif} onChange={e => setForm({ ...form, nom_alternatif: e.target.value })} placeholder="Boutique Centre" />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Localité">
             <input className={inputCls} value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} placeholder="Yako" />
           </Field>
@@ -245,7 +245,7 @@ export default function ClientsPage() {
         <Field label="Plafond de crédit (XOF)">
           <input className={inputCls + " num"} type="number" value={form.plafond} onChange={e => setForm({ ...form, plafond: e.target.value })} placeholder="500000" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="N° identifiant pro 1 (optionnel)">
             <input className={inputCls} value={form.identifiant_pro1} onChange={e => setForm({ ...form, identifiant_pro1: e.target.value })} />
           </Field>

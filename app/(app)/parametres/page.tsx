@@ -305,7 +305,7 @@ export default function ParametresPage() {
               Ces taux sont appliqués automatiquement lors de chaque transaction. Modifiez selon vos conditions réelles avec chaque opérateur.
             </p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-sand-200 text-left text-[12px] uppercase tracking-wide text-ink-400">

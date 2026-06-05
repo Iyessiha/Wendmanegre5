@@ -101,7 +101,7 @@ export default function Sidebar({ role = "caissier" }: { role?: string }) {
   }
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-white/95 backdrop-blur-sm border-r border-sand-200">
+    <aside className="hidden lg:flex fixed inset-y-0 left-0 z-30 h-full w-64 flex-col bg-white/95 backdrop-blur-sm border-r border-sand-200 shadow-sm">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-sand-100">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-clay text-sand-50 font-bold text-sm shadow-sm">

@@ -149,7 +149,7 @@ export default function CaissePage() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Solde caisse"       value={formatXOF(solde)}         icon={<Wallet size={18} />}       accent="leaf" />
         <KpiCard label="Frais encaissés"    value={formatXOF(stats.fraisJ)}  icon={<HandCoins size={18} />}   accent="gold" />
         <KpiCard label="Volume Mobile Money" value={formatXOF(stats.volumeMM)} icon={<Smartphone size={18} />} accent="ink" />
@@ -157,7 +157,7 @@ export default function CaissePage() {
       </div>
 
       {/* 6 types de transactions */}
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3">
         {TX_TYPES.map(t => (
           <button key={t.type} onClick={() => setOpenTx(t.type)}
             className="group flex items-start gap-3 rounded-2xl border border-sand-200 bg-white/70 p-4 text-left shadow-card transition-all hover:border-clay/30 hover:shadow-lift">
@@ -242,7 +242,7 @@ export default function CaissePage() {
             )}
 
             {openTx !== "CREDIT" && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Nom client">
                   <input className={inputCls} value={form.nomClient} onChange={e => setForm(f => ({ ...f, nomClient: e.target.value }))} placeholder="Optionnel" />
                 </Field>

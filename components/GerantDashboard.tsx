@@ -220,7 +220,7 @@ export default function GerantDashboard({ profile }: { profile: Profile }) {
       {/* Actions rapides selon permissions */}
       <Card className="mt-5 p-5">
         <h3 className="display mb-4 text-base font-bold text-ink">Mes actions rapides</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
           <QuickAction href="/clients" icon={Users}  label="Commerçants" sub="Voir le réseau"    allowed={can("clients_voir")} />
           <QuickAction href="/prets"   icon={HandCoins} label="Prêts"    sub="Gérer l'encours"  allowed={can("prets_voir")} />
           <QuickAction href="/caisses" icon={Wallet} label="Caisses"     sub="Alimenter"         allowed={can("caisses_voir")} />

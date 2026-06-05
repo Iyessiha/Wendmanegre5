@@ -150,7 +150,7 @@ export default function FacturationModule({ docType, embedded = false }: { docTy
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-sand-200 text-left text-[12px] uppercase tracking-wide text-ink-400">
@@ -216,7 +216,7 @@ export default function FacturationModule({ docType, embedded = false }: { docTy
 
       {/* Modal création */}
       <Modal open={open} onClose={() => setOpen(false)} title={`Nouvelle ${motDoc}`}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Commerçant">
             <select className={inputCls} value={form.client_id} onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))}>
               <option value="">— Choisir —</option>
@@ -275,11 +275,11 @@ export default function FacturationModule({ docType, embedded = false }: { docTy
             <div className="mt-1 flex justify-between border-t border-sand-200 pt-1"><span className="font-medium text-ink-600">Reste à payer</span><span className="num font-semibold text-ember-600">{formatXOF(payFor.reste_a_payer ?? 0)}</span></div>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Montant"><input className={inputCls + " num"} type="number" value={payForm.montant} onChange={e => setPayForm(f => ({ ...f, montant: e.target.value }))} /></Field>
           <Field label="Date"><input className={inputCls} type="date" value={payForm.date} onChange={e => setPayForm(f => ({ ...f, date: e.target.value }))} /></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Mode de paiement">
             <select className={inputCls} value={payForm.mode} onChange={e => setPayForm(f => ({ ...f, mode: e.target.value }))}>
               {["Espèces", "Versement", "Orange Money", "Moov Money", "Virement"].map(m => <option key={m}>{m}</option>)}

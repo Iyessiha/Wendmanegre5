@@ -136,7 +136,7 @@ export default function UtilisateursPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-sand-200 text-left text-[12px] uppercase tracking-wide text-ink-400">

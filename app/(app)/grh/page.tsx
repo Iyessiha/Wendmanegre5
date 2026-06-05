@@ -223,7 +223,7 @@ export default function GRHPage() {
 
           {/* Tableau pointage */}
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-sand-200 bg-sand-50/50">
@@ -306,7 +306,7 @@ export default function GRHPage() {
           </div>
 
           {/* Soldes des congés */}
-          <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
             {employes.filter(e => e.role !== "admin").map(emp => (
               <Card key={emp.id} className="p-4">
                 <div className="text-[12px] font-medium text-ink">{emp.nom.split(" ")[0]}</div>
@@ -380,7 +380,7 @@ export default function GRHPage() {
           </div>
 
           {/* Récap masse salariale */}
-          <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { l: "Masse salariale nette", v: totalMasseSalariale, cls: "text-ink" },
               { l: "Coût total employeur",  v: totalCoutEmployeur,  cls: "text-clay-700" },
@@ -396,7 +396,7 @@ export default function GRHPage() {
 
           {/* Tableau des fiches de paie */}
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-sand-200 text-[12px] uppercase tracking-wide text-ink-400">
@@ -471,7 +471,7 @@ export default function GRHPage() {
                       <div className="text-[12px] text-ink-400">{p.poste}</div>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
                       { l: "Transactions",  v: String(p.nbTx)               },
                       { l: "Volume traité", v: formatXOF(p.volumeMM).replace(" F","")  },
@@ -494,7 +494,7 @@ export default function GRHPage() {
             <div className="border-b border-sand-200 px-5 py-4">
               <h3 className="display text-lg font-bold text-ink">Comparatif des performances</h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-sand-200 text-[12px] uppercase tracking-wide text-ink-400">
@@ -610,7 +610,7 @@ export default function GRHPage() {
             {[["annuel","Congé annuel"],["maladie","Maladie"],["maternite","Maternité"],["paternite","Paternité"],["deces","Décès familial"],["sans_solde","Sans solde"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Date début"><input className={inputCls} type="date" value={congeForm.date_debut} onChange={e => setCongeForm(f => ({ ...f, date_debut: e.target.value }))} /></Field>
           <Field label="Date fin"><input className={inputCls} type="date" value={congeForm.date_fin} onChange={e => setCongeForm(f => ({ ...f, date_fin: e.target.value }))} /></Field>
         </div>

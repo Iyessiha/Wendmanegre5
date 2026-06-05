@@ -13,14 +13,18 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="display text-[28px] font-bold leading-tight text-ink sm:text-[32px]">
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="display text-[24px] font-bold leading-tight text-ink sm:text-[30px]">
           {title}
         </h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
+        {subtitle && <p className="mt-1 text-[13px] text-ink-500 leading-relaxed">{subtitle}</p>}
       </div>
-      {action}
+      {action && (
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {action}
+        </div>
+      )}
     </div>
   );
 }
@@ -75,17 +79,19 @@ export function Modal({
         className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md animate-fade-up rounded-2xl border border-sand-200 bg-sand-50 p-6 shadow-lift sm:rounded-2xl rounded-t-2xl rounded-b-none sm:rounded-b-2xl sm:my-auto max-h-[92vh] overflow-y-auto">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="display text-xl font-bold text-ink">{title}</h2>
+      <div className="relative z-10 w-full sm:max-w-lg animate-fade-up rounded-t-2xl sm:rounded-2xl border border-sand-200 bg-sand-50 shadow-lift max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-sand-50 px-5 py-4 border-b border-sand-100 rounded-t-2xl">
+          <h2 className="display text-lg font-bold text-ink leading-tight pr-4">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-ink-400 hover:bg-sand-200 hover:text-ink"
+            className="shrink-0 rounded-xl p-1.5 text-ink-400 hover:bg-sand-200 hover:text-ink transition-colors"
           >
             <X size={20} />
           </button>
         </div>
-        {children}
+        <div className="p-5 pb-safe">
+          {children}
+        </div>
       </div>
     </div>
   );

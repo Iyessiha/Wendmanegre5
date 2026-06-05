@@ -252,7 +252,7 @@ export default function OperateursPage() {
             {/* ── APERÇU ──────────────────────────────────────────────────── */}
             {tab==="Aperçu" && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
                     {l:"Solde flotte",v:formatXOF(sel.solde_flotte)},
                     {l:"Types de frais",v:`${sel.nb_frais} règles`},
@@ -414,15 +414,15 @@ export default function OperateursPage() {
             {/* ── PARAMÈTRES ──────────────────────────────────────────────── */}
             {tab==="Paramètres" && (
               <div className="space-y-4 max-w-2xl">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Nom affiché"><input className={inputCls} value={paramF.nom} onChange={e=>setParamF(f=>({...f,nom:e.target.value}))}/></Field>
                   <Field label="Couleur principale"><div className="flex gap-2"><input className={inputCls+" flex-1 num"} value={paramF.couleur} onChange={e=>setParamF(f=>({...f,couleur:e.target.value}))}/><input type="color" value={paramF.couleur} onChange={e=>setParamF(f=>({...f,couleur:e.target.value}))} className="h-10 w-10 cursor-pointer rounded-lg border border-sand-200"/></div></Field>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Commission dealer (%)"><input className={inputCls+" num"} type="number" step="0.1" value={paramF.commission_taux} onChange={e=>setParamF(f=>({...f,commission_taux:e.target.value}))}/></Field>
                   <Field label="USSD solde"><input className={inputCls+" num"} value={paramF.ussd_solde} placeholder="*144#" onChange={e=>setParamF(f=>({...f,ussd_solde:e.target.value}))}/></Field>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Téléphone assistance"><input className={inputCls} value={paramF.telephone_support} onChange={e=>setParamF(f=>({...f,telephone_support:e.target.value}))}/></Field>
                   <Field label="Slogan"><input className={inputCls} value={paramF.slogan} onChange={e=>setParamF(f=>({...f,slogan:e.target.value}))}/></Field>
                 </div>
@@ -442,7 +442,7 @@ export default function OperateursPage() {
       {/* Flotte */}
       <Modal open={!!openFlotte} onClose={()=>setOpenFlotte(null)} title={openFlotte==="appro"?"Approvisionner la flotte":"Retrait de flotte"}>
         <div className="mb-3 rounded-xl bg-sand-100 px-4 py-2.5 text-[13px]">Solde actuel : <strong className="num">{formatXOF(sel?.solde_flotte??0)}</strong></div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Montant (XOF)"><input className={inputCls+" num"} type="number" value={flotteF.montant} onChange={e=>setFlotteF(f=>({...f,montant:e.target.value}))}/></Field>
           <Field label="Libellé"><input className={inputCls} value={flotteF.libelle} onChange={e=>setFlotteF(f=>({...f,libelle:e.target.value}))}/></Field>
         </div>
@@ -455,7 +455,7 @@ export default function OperateursPage() {
       {/* Nouveau frais */}
       <Modal open={newFrais} onClose={()=>setNewFrais(false)} title="Nouveau type de frais">
         <Field label="Nom"><input className={inputCls} value={nfF.nom} onChange={e=>setNfF(f=>({...f,nom:e.target.value}))}/></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Type d'opération">
             <select className={inputCls} value={nfF.type_operation} onChange={e=>setNfF(f=>({...f,type_operation:e.target.value}))}>
               {Object.entries(TYPE_OP_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
@@ -467,7 +467,7 @@ export default function OperateursPage() {
             </select>
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Mode">
             <select className={inputCls} value={nfF.mode} onChange={e=>setNfF(f=>({...f,mode:e.target.value}))}>
               {Object.entries(MODE_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
@@ -476,7 +476,7 @@ export default function OperateursPage() {
           <Field label="Valeur"><input className={inputCls+" num"} type="number" value={nfF.valeur} onChange={e=>setNfF(f=>({...f,valeur:e.target.value}))}/></Field>
           <Field label="Notes"><input className={inputCls} value={nfF.notes} onChange={e=>setNfF(f=>({...f,notes:e.target.value}))}/></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Montant min (XOF)"><input className={inputCls+" num"} type="number" value={nfF.montant_min} onChange={e=>setNfF(f=>({...f,montant_min:e.target.value}))}/></Field>
           <Field label="Montant max (XOF)"><input className={inputCls+" num"} type="number" value={nfF.montant_max} onChange={e=>setNfF(f=>({...f,montant_max:e.target.value}))}/></Field>
         </div>
@@ -489,7 +489,7 @@ export default function OperateursPage() {
       {/* Édition frais */}
       <Modal open={!!editFrais} onClose={()=>setEditFrais(null)} title={`Modifier — ${editFrais?.nom}`}>
         <Field label="Nom"><input className={inputCls} value={efF.nom} onChange={e=>setEfF(f=>({...f,nom:e.target.value}))}/></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Mode">
             <select className={inputCls} value={efF.mode} onChange={e=>setEfF(f=>({...f,mode:e.target.value}))}>
               {Object.entries(MODE_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
@@ -497,7 +497,7 @@ export default function OperateursPage() {
           </Field>
           <Field label="Valeur"><input className={inputCls+" num"} type="number" step="0.1" value={efF.valeur} onChange={e=>setEfF(f=>({...f,valeur:e.target.value}))}/></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Min (XOF)"><input className={inputCls+" num"} type="number" value={efF.montant_min} onChange={e=>setEfF(f=>({...f,montant_min:e.target.value}))}/></Field>
           <Field label="Max (XOF)"><input className={inputCls+" num"} type="number" value={efF.montant_max} onChange={e=>setEfF(f=>({...f,montant_max:e.target.value}))}/></Field>
         </div>
@@ -514,7 +514,7 @@ export default function OperateursPage() {
 
       {/* Nouveau palier */}
       <Modal open={!!newPalier} onClose={()=>setNewPalier(null)} title="Ajouter une tranche">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="De (XOF)"><input className={inputCls+" num"} type="number" value={npF.tranche_min} onChange={e=>setNpF(f=>({...f,tranche_min:e.target.value}))}/></Field>
           <Field label="À (XOF)"><input className={inputCls+" num"} type="number" value={npF.tranche_max} onChange={e=>setNpF(f=>({...f,tranche_max:e.target.value}))}/></Field>
           <Field label="Frais fixe (XOF)"><input className={inputCls+" num"} type="number" value={npF.frais_fixe} onChange={e=>setNpF(f=>({...f,frais_fixe:e.target.value}))}/></Field>

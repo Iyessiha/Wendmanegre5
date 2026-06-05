@@ -57,7 +57,7 @@ export default function StockPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-sand-200 text-left text-[11px] uppercase text-ink-400 bg-sand-50">

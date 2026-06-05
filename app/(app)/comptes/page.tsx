@@ -157,7 +157,7 @@ export default function TresoreriePage() {
       )}
 
       {/* KPIs */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 lg:grid-cols-5">
         {[
           { l:"Caisses SaaS",   v:resume.totalCaisses, i:<Shield size={14} className="text-clay"/> },
           { l:"Banques",        v:resume.totalBanques, i:<Building2 size={14} className="text-blue-600"/> },
@@ -264,7 +264,7 @@ export default function TresoreriePage() {
             {actifs.filter(c=>c.uid!==virF.from).map(c=><option key={c.uid} value={c.uid}>{c.nom}</option>)}
           </select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Montant (XOF)"><input className={inputCls+" num"} type="number" value={virF.montant} onChange={e=>setVirF(f=>({...f,montant:e.target.value}))}/></Field>
           <Field label="Libellé"><input className={inputCls} value={virF.libelle} onChange={e=>setVirF(f=>({...f,libelle:e.target.value}))}/></Field>
         </div>
@@ -278,7 +278,7 @@ export default function TresoreriePage() {
       {/* Modal Alim / Retrait */}
       <Modal open={!!openMvt} onClose={()=>setOpenMvt(null)} title={`${openMvt?.mode==="appro"?"Alimenter":"Retirer"} — ${openMvt?.compte.nom}`}>
         {openMvt&&<div className="mb-3 rounded-xl bg-sand-100 px-4 py-2.5 text-[13px]">Solde actuel : <strong className="num">{formatXOF(openMvt.compte.solde)}</strong></div>}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Montant (XOF)"><input className={inputCls+" num"} type="number" value={mvtF.montant} onChange={e=>setMvtF(f=>({...f,montant:e.target.value}))}/></Field>
           <Field label="Libellé"><input className={inputCls} value={mvtF.libelle} onChange={e=>setMvtF(f=>({...f,libelle:e.target.value}))}/></Field>
         </div>
@@ -294,7 +294,7 @@ export default function TresoreriePage() {
         {openEdit&&<>
           <Field label="Nom"><input className={inputCls} value={eF.nom} onChange={e=>setEF(f=>({...f,nom:e.target.value}))}/></Field>
           {openEdit.source==="caisse"?(
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Agence"><input className={inputCls} value={eF.agence} onChange={e=>setEF(f=>({...f,agence:e.target.value}))}/></Field>
               <Field label="Caissier">
                 <select className={inputCls} value={eF.assignee_id} onChange={e=>setEF(f=>({...f,assignee_id:e.target.value}))}>
@@ -305,7 +305,7 @@ export default function TresoreriePage() {
             </div>
           ):(
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Type">
                   <select className={inputCls} value={eF.type} onChange={e=>setEF(f=>({...f,type:e.target.value as TypeCompte}))}>
                     {TYPES_DOL.map(t=><option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
@@ -313,7 +313,7 @@ export default function TresoreriePage() {
                 </Field>
                 <Field label="Banque"><input className={inputCls} value={eF.banque} onChange={e=>setEF(f=>({...f,banque:e.target.value}))}/></Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="N° compte"><input className={inputCls+" num"} value={eF.numero_compte} onChange={e=>setEF(f=>({...f,numero_compte:e.target.value}))}/></Field>
                 <Field label="IBAN"><input className={inputCls+" num"} value={eF.iban} onChange={e=>setEF(f=>({...f,iban:e.target.value}))}/></Field>
               </div>
@@ -344,7 +344,7 @@ export default function TresoreriePage() {
         </div>
         <Field label="Nom"><input className={inputCls} value={nF.nom} onChange={e=>setNF(f=>({...f,nom:e.target.value}))}/></Field>
         {newType==="caisse"?(
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Agence"><input className={inputCls} value={nF.agence} onChange={e=>setNF(f=>({...f,agence:e.target.value}))}/></Field>
             <Field label="Caissier">
               <select className={inputCls} value={nF.assignee_id} onChange={e=>setNF(f=>({...f,assignee_id:e.target.value}))}>
@@ -355,7 +355,7 @@ export default function TresoreriePage() {
           </div>
         ):(
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Type">
                 <select className={inputCls} value={nF.type} onChange={e=>setNF(f=>({...f,type:e.target.value as TypeCompte}))}>
                   {TYPES_DOL.map(t=><option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
@@ -363,11 +363,11 @@ export default function TresoreriePage() {
               </Field>
               <Field label="Banque / Opérateur"><input className={inputCls} value={nF.banque} onChange={e=>setNF(f=>({...f,banque:e.target.value}))}/></Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="N° compte"><input className={inputCls+" num"} value={nF.numero_compte} onChange={e=>setNF(f=>({...f,numero_compte:e.target.value}))}/></Field>
               <Field label="Solde initial (XOF)"><input className={inputCls+" num"} type="number" value={nF.solde_initial} onChange={e=>setNF(f=>({...f,solde_initial:e.target.value}))}/></Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="IBAN"><input className={inputCls+" num"} value={nF.iban} onChange={e=>setNF(f=>({...f,iban:e.target.value}))}/></Field>
               <Field label="Titulaire"><input className={inputCls} value={nF.titulaire} onChange={e=>setNF(f=>({...f,titulaire:e.target.value}))}/></Field>
             </div>

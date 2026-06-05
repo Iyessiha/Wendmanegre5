@@ -117,7 +117,7 @@ export default function ComptabilitePage() {
             <div className="border-b border-sand-200 px-5 py-4">
               <h3 className="display text-lg font-bold text-ink">Détail par opérateur</h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-sand-200 text-left text-[12px] uppercase tracking-wide text-ink-400">

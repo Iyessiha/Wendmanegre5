@@ -83,3 +83,21 @@ body {
   .thermal { max-width: 100%; font-size: 10px; }
   @page.thermal { size: 58mm auto; margin: 2mm; }
 }
+
+/* ── Responsive utilities ────────────────────────────────────────── */
+.pb-safe     { padding-bottom: env(safe-area-inset-bottom, 1rem); }
+.has-mobile-nav { padding-bottom: 80px; }
+
+@media (min-width: 640px) {
+  .has-mobile-nav { padding-bottom: 2rem; }
+}
+
+/* Tables scrollent sur mobile */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Inputs full-width sur mobile */
+@media (max-width: 639px) {
+  input[type="number"], input[type="text"], input[type="email"],
+  input[type="tel"], input[type="date"], input[type="month"],
+  select, textarea { font-size: 16px !important; } /* évite zoom iOS */
+}

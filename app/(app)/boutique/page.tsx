@@ -340,7 +340,7 @@ export default function BoutiquePage() {
 
           {/* Tableau catalogue */}
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-sand-200 text-[12px] uppercase tracking-wide text-ink-400">
@@ -408,7 +408,7 @@ export default function BoutiquePage() {
           </Card>
 
           {/* Résumé stock en bas */}
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { l: "Valeur au coût",    v: stats.valeurAchat,  cls: "text-ink-700" },
               { l: "Valeur catalogue",  v: stats.valeurVente,  cls: "text-ink"     },
@@ -461,7 +461,7 @@ export default function BoutiquePage() {
                   </div>
                 </div>
                 <Card className="overflow-hidden">
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-sand-200 text-[12px] uppercase tracking-wide text-ink-400">
@@ -657,7 +657,7 @@ export default function BoutiquePage() {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-sand-200 text-[12px] uppercase tracking-wide text-ink-400">
@@ -731,7 +731,7 @@ export default function BoutiquePage() {
             {/* Tableau marges par produit */}
             <Card className="p-5 lg:col-span-2 overflow-hidden">
               <h3 className="display mb-4 text-base font-bold text-ink">Analyse des marges</h3>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-sand-200 text-[12px] uppercase text-ink-400">
