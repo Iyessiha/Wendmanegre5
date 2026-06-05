@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, HandCoins, Wallet,
   Package, Settings, LogOut, Store, Calculator, UserCog,
   FileText, ShieldCheck, Radio, ArrowLeftRight, Building2,
-  TrendingUp, Download, BarChart3, Boxes,
+  TrendingUp, Download, BarChart3, Boxes, ShoppingCart,
 } from "lucide-react";
 import { ENTREPRISE } from "@/lib/data";
 import { getClient } from "@/lib/supabase";
@@ -35,6 +35,7 @@ const navAdmin: NavSection[] = [
     items: [
       { href: "/clients",      label: "Commerçants",    icon: Users          },
       { href: "/facturation",  label: "Facturation",    icon: FileText       },
+      { href: "/commandes",    label: "Commandes",      icon: ShoppingCart   },
       { href: "/prets",        label: "Prêts & Crédits",icon: HandCoins      },
     ],
   },

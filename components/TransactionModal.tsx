@@ -7,9 +7,8 @@ import {
 } from "lucide-react";
 import { Modal, Field, inputCls, Badge } from "@/components/ui";
 import { formatXOF } from "@/lib/format";
-import { useClientSearch, type ClientLight } from "@/lib/hooks";
+import { useClientSearch, usePrets, octroyerPret, type ClientLight } from "@/lib/hooks";
 import { useOperateurs, type Operateur } from "@/lib/hooks-operateurs";
-import { usePrets } from "@/lib/hooks";
 import { enregistrerTransaction, type TypeTransaction } from "@/lib/hooks-transactions";
 
 // ── Définitions des 6 types ──────────────────────────────────────────────────
@@ -185,30 +184,38 @@ export default function TransactionModal({ open, initialType = "DEPOT", caisses,
     if (selType === "ENVOI" && (!f.nom_dest && !f.telephone_dest)) { setErr("Renseignez le bénéficiaire."); return; }
     setBusy(true); setErr(null);
     try {
-      await enregistrerTransaction({
-        type: selType,
-        operateur: f.operateur || undefined,
-        montant: m,
-        frais: Number(f.frais) || 0,
-        nom_client: client?.nom || undefined,
-        telephone_client: client?.telephone || f.telephone_mobile || undefined,
-        client_id: client?.id || undefined,
-        caisse_id: caisseId,
-        user_id: userId,
-        reference: f.reference || undefined,
-        // Envoi
-        telephone_dest: f.telephone_dest || undefined,
-        nom_dest: f.nom_dest || undefined,
-        operateur_dest: f.operateur_dest || undefined,
-        // Crédit
-        type_credit: f.type_credit || undefined,
-        echeance: f.echeance || undefined,
-        // Remboursement
-        mode_paiement: f.mode_paiement || undefined,
-        // Réception
-        expediteur_nom: f.expediteur_nom || undefined,
-        expediteur_tel: f.expediteur_tel || undefined,
-      });
+      if (selType === "CREDIT" && client) {
+        // Crédit → crée un prêt formel dans la table prets
+        await octroyerPret({
+          clientId:      client.id,
+          typeOperation: f.type_credit || f.operateur || "Crédit",
+          montant:       m,
+          caisseId:      caisseId,
+          echeance:      f.echeance,
+          userId,
+        });
+      } else {
+        await enregistrerTransaction({
+          type: selType,
+          operateur: f.operateur || undefined,
+          montant: m,
+          frais: Number(f.frais) || 0,
+          nom_client: client?.nom || undefined,
+          telephone_client: client?.telephone || f.telephone_mobile || undefined,
+          client_id: client?.id || undefined,
+          caisse_id: caisseId,
+          user_id: userId,
+          reference: f.reference || undefined,
+          telephone_dest: f.telephone_dest || undefined,
+          nom_dest: f.nom_dest || undefined,
+          operateur_dest: f.operateur_dest || undefined,
+          type_credit: f.type_credit || undefined,
+          echeance: f.echeance || undefined,
+          mode_paiement: f.mode_paiement || undefined,
+          expediteur_nom: f.expediteur_nom || undefined,
+          expediteur_tel: f.expediteur_tel || undefined,
+        });
+      }
       onSuccess();
       onClose();
     } catch (e: any) { setErr(e?.message ?? "Erreur d'enregistrement."); }

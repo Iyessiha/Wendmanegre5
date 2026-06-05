@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Package, Warehouse, Truck, History, ClipboardList,
   BarChart2, Plus, Search, Edit2, Printer, ShoppingCart,
   ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle,
   Check, X, ChevronDown, Filter, Trash2, Image as ImageIcon, FileText,
+  Headphones, Layers, Zap, Globe,
 } from "lucide-react";
 import {
   useProduits, useFournisseurs, useCommandes, useMouvements, useVentes,
@@ -15,6 +16,7 @@ import {
   type Produit, type CommandeFournisseur, type Entrepot,
 } from "@/lib/hooks-stock";
 import { useProfiles } from "@/lib/hooks2";
+import { getClient } from "@/lib/supabase";
 import { PhotoProfil } from "@/components/FicheMedia";
 import FacturationModule from "@/components/FacturationModule";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
@@ -27,14 +29,12 @@ import {
 // ── Constantes ────────────────────────────────────────────
 
 const TABS = [
-  { id: "catalogue",        label: "Catalogue",       icon: Package     },
-  { id: "entrepots",        label: "Entrepôts",       icon: Warehouse   },
-  { id: "fournisseurs",     label: "Fournisseurs",    icon: Truck       },
-  { id: "commandes",        label: "Cmd. fournisseurs", icon: ClipboardList},
-  { id: "commandes_clients", label: "Cmd. clients",     icon: FileText    },
-  { id: "mouvements",       label: "Mouvements",      icon: History     },
-  { id: "ventes",           label: "Ventes POS",      icon: ShoppingCart},
-  { id: "analyses",         label: "Analyses",        icon: BarChart2   },
+  { id: "produits",     label: "Produits",     icon: Package      },
+  { id: "services",     label: "Services",     icon: Headphones   },
+  { id: "stocks",       label: "Stocks",       icon: Layers       },
+  { id: "entrepots",    label: "Entrepôts",    icon: Warehouse    },
+  { id: "mouvements",   label: "Mouvements",   icon: History      },
+  { id: "statistiques", label: "Statistiques", icon: BarChart2    },
 ];
 
 const NIVEAU_BADGE: Record<string, string> = {
@@ -119,6 +119,35 @@ export default function BoutiquePage() {
   const [catFiltre, setCatFiltre] = useState("tout");
   const [niveauFiltre, setNiveauFiltre] = useState("tout");
   const [entrepotFiltre, setEntrepotFiltre] = useState("tout");
+
+  // ── Services ──────────────────────────────────────────────────────────────
+  const [services, setServices] = useState<any[]>([]);
+  const [openNvService, setOpenNvService] = useState(false);
+  const [openEditService, setOpenEditService] = useState<any|null>(null);
+  const [svcForm, setSvcForm] = useState({ nom:"", description:"", categorie:"mobile_money", operateur_id:"", tarif_base:"0", commission_taux:"0", notes:"" });
+  const [svcBusy, setSvcBusy] = useState(false); const [svcErr, setSvcErr] = useState<string|null>(null);
+
+  const CAT_SVC_LABEL: Record<string,string> = { mobile_money:"Mobile Money", transfert:"Transfert", recharge:"Recharge", sim:"SIM", credit:"Crédit", autre:"Autre" };
+  const CAT_SVC_BADGE: Record<string,string> = { mobile_money:"bg-orange-100 text-orange-700", transfert:"bg-blue-100 text-blue-700", recharge:"bg-teal-100 text-teal-700", sim:"bg-purple-100 text-purple-700", credit:"bg-amber-100 text-amber-700", autre:"bg-sand-200 text-ink-500" };
+
+  const refetchServices = useCallback(async () => {
+    const { data } = await (getClient() as any).from("services").select("*, operateur:operateurs(nom,couleur)").order("categorie").order("nom");
+    setServices(data ?? []);
+  }, []);
+  useEffect(() => { refetchServices(); }, [refetchServices]);
+
+  async function submitService(editing?: any) {
+    if (!svcForm.nom.trim()) { setSvcErr("Nom requis."); return; }
+    setSvcBusy(true); setSvcErr(null);
+    const payload = { nom:svcForm.nom.trim(), description:svcForm.description||null, categorie:svcForm.categorie, operateur_id:svcForm.operateur_id||null, tarif_base:Number(svcForm.tarif_base)||0, commission_taux:Number(svcForm.commission_taux)||0, notes:svcForm.notes||null };
+    const sb = getClient() as any;
+    if (editing) { await sb.from("services").update(payload).eq("id",editing.id); setOpenEditService(null); }
+    else { await sb.from("services").insert(payload); setOpenNvService(false); }
+    setSvcForm({ nom:"", description:"", categorie:"mobile_money", operateur_id:"", tarif_base:"0", commission_taux:"0", notes:"" });
+    refetchServices(); setSvcBusy(false);
+  }
+
+  function openSvcEdit(s:any) { setSvcErr(null); setSvcForm({ nom:s.nom, description:s.description??"", categorie:s.categorie, operateur_id:s.operateur_id??"", tarif_base:String(s.tarif_base), commission_taux:String(s.commission_taux), notes:s.notes??"" }); setOpenEditService(s); }
 
   // Modals
   const [openVente, setOpenVente] = useState<Produit | null>(null);
@@ -268,11 +297,30 @@ export default function BoutiquePage() {
 
   // ── Render ─────────────────────────────────────────────
 
+  const headerActions: Record<string, React.ReactNode> = {
+    produits:     <Btn onClick={() => setOpenNouveauProduit(true)}><Plus size={15}/> Nouveau produit</Btn>,
+    services:     <Btn onClick={()=>{ setSvcErr(null); setSvcForm({nom:"",description:"",categorie:"mobile_money",operateur_id:"",tarif_base:"0",commission_taux:"0",notes:""}); setOpenNvService(true); }}><Plus size={15}/> Nouveau service</Btn>,
+    stocks:       null,
+    entrepots:    <Btn onClick={() => { setEntForm({nom:"",ville:"",adresse:"",responsable_id:""}); setOpenNewEntrepot(true); }}><Plus size={15}/> Nouvel entrepôt</Btn>,
+    mouvements:   null,
+    statistiques: null,
+  };
+
+  const headerTitles: Record<string, string> = {
+    produits:     "Produits",
+    services:     "Services",
+    stocks:       "Stocks",
+    entrepots:    "Entrepôts",
+    mouvements:   "Mouvements de stock",
+    statistiques: "Statistiques",
+  };
+
   return (
     <div className="animate-fade-up">
       <PageHeader
-        title="Boutique & Stock"
-        subtitle={`Valeur catalogue ${formatXOF(stats.valeurVente)} · Marge potentielle ${formatXOF(stats.margeStock)}`}
+        title={headerTitles[tab] ?? "Boutique & Stock"}
+        subtitle={tab === "produits" ? `${produits.length} produits · valeur ${formatXOF(stats.valeurVente)}` : undefined}
+        action={headerActions[tab]}
       />
 
       {/* Tabs scrollables */}
@@ -286,13 +334,8 @@ export default function BoutiquePage() {
         ))}
       </div>
 
-      {/* ── COMMANDES CLIENTS ── */}
-      {tab === "commandes_clients" && (
-        <FacturationModule docType="commande" embedded />
-      )}
-
-      {/* ── CATALOGUE ── */}
-      {tab === "catalogue" && (
+      {/* ── PRODUITS ── */}
+      {tab === "produits" && (
         <div>
           {/* KPIs alertes */}
           {(stats.enRupture > 0 || stats.enCritique > 0) && (
@@ -333,9 +376,8 @@ export default function BoutiquePage() {
               ))}
             </div>
           </div>
-          <div className="mb-3 flex justify-between items-center">
+          <div className="mb-3 flex items-center justify-between">
             <span className="text-[13px] text-ink-500">{produitsFiltres.length} produits</span>
-            <Btn onClick={() => setOpenNouveauProduit(true)} className="tap"><Plus size={15} /> Ajouter</Btn>
           </div>
 
           {/* Tableau catalogue */}
@@ -423,13 +465,124 @@ export default function BoutiquePage() {
         </div>
       )}
 
+      {/* ── SERVICES ─────────────────────────────────────────────────────── */}
+      {tab === "services" && (
+        <div>
+          {/* Résumé par catégorie */}
+          {Object.keys(
+            services.reduce((m:any,s:any)=>{ m[s.categorie]=(m[s.categorie]??0)+1; return m; }, {})
+          ).length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {Object.entries(
+                services.reduce((m:any,s:any)=>{ m[s.categorie]=(m[s.categorie]??0)+1; return m; }, {})
+              ).map(([cat,nb]:any)=>(
+                <div key={cat} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-medium ${CAT_SVC_BADGE[cat]??'bg-sand-200 text-ink-500'}`}>
+                  {CAT_SVC_LABEL[cat]??cat} <span className="font-bold">{nb}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {services.map((s:any) => (
+              <Card key={s.id} className={`p-4 ${!s.actif?"opacity-50":""}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      <Badge className={CAT_SVC_BADGE[s.categorie]??'bg-sand-200 text-ink-500'}>{CAT_SVC_LABEL[s.categorie]??s.categorie}</Badge>
+                      {s.operateur && <Badge className="bg-sand-100 text-ink-500">{s.operateur.nom}</Badge>}
+                    </div>
+                    <div className="font-semibold text-ink">{s.nom}</div>
+                    {s.description && <div className="text-[12px] text-ink-400 mt-0.5">{s.description}</div>}
+                  </div>
+                  <button onClick={()=>openSvcEdit(s)} className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 tap"><Edit2 size={13}/></button>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-[12px]">
+                  {s.tarif_base > 0 ? <span className="num font-semibold text-ink">{formatXOF(s.tarif_base)}</span> : <span className="text-ink-400">Gratuit</span>}
+                  {s.commission_taux > 0 && <span className="text-leaf-600">Commission {s.commission_taux}%</span>}
+                </div>
+              </Card>
+            ))}
+            {services.length === 0 && <Card className="p-8 text-center text-[13px] text-ink-400 sm:col-span-2 lg:col-span-3">Aucun service configuré.</Card>}
+          </div>
+        </div>
+      )}
+
+      {/* ── STOCKS ───────────────────────────────────────────────────────── */}
+      {tab === "stocks" && (
+        <div>
+          {/* KPI stock */}
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { l:"Valeur totale (achat)",   v:formatXOF(stats.valeurAchat) },
+              { l:"Valeur totale (vente)",   v:formatXOF(stats.valeurVente) },
+              { l:"Produits en rupture",     v:String(stats.enRupture),   accent:"text-ember-600" },
+              { l:"Produits critiques",      v:String(stats.enCritique),  accent:"text-amber-600" },
+            ].map(s=>(
+              <Card key={s.l} className="p-4">
+                <div className="text-[12px] text-ink-400">{s.l}</div>
+                <div className={`num mt-1 text-xl font-bold ${(s as any).accent ?? "text-ink"}`}>{s.v}</div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Tableau stocks */}
+          <Card className="overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-sand-100 px-4 py-3">
+              <div className="flex flex-1 items-center gap-2 rounded-xl border border-sand-200 bg-white/70 px-3 py-2">
+                <Search size={14} className="text-ink-400"/>
+                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un produit…" className="w-full bg-transparent text-[13px] outline-none placeholder:text-ink-400"/>
+              </div>
+              <select className={inputCls+" w-auto text-[13px]"} value={niveauFiltre} onChange={e=>setNiveauFiltre(e.target.value)}>
+                <option value="tout">Tous niveaux</option>
+                {["normal","faible","critique","rupture"].map(n=><option key={n} value={n}>{n.charAt(0).toUpperCase()+n.slice(1)}</option>)}
+              </select>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-sand-200 text-[11px] uppercase tracking-wide text-ink-400">
+                    {["Produit","Catégorie","Entrepôt","Stock","Seuil","Valeur","Niveau",""].map(h=>(
+                      <th key={h} className={`px-4 py-3 font-medium ${["Stock","Seuil","Valeur"].includes(h)?"text-right":"text-left"}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {produitsFiltres.map(p=>(
+                    <tr key={p.id} className="border-b border-sand-100 last:border-0 hover:bg-sand-50">
+                      <td className="px-4 py-3 font-medium text-ink">{p.nom}</td>
+                      <td className="px-4 py-3 text-[12px] text-ink-500">{p.categorie}</td>
+                      <td className="px-4 py-3 text-[12px] text-ink-400">{p.entrepot}</td>
+                      <td className="num px-4 py-3 text-right font-bold text-ink">{p.stock} {p.unite}</td>
+                      <td className="num px-4 py-3 text-right text-ink-400">{p.seuil_alerte}</td>
+                      <td className="num px-4 py-3 text-right text-ink-500">{formatXOF(p.valeur_achat)}</td>
+                      <td className="px-4 py-3">
+                        <Badge className={NIVEAU_BADGE[p.niveau_stock] ?? "bg-sand-200 text-ink-600"}>
+                          {p.niveau_stock}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={()=>{ setAjustForm({quantite:"",motif:"perte",notes:""}); setOpenAjustement(p); }}
+                          className="rounded-lg bg-sand-100 px-2 py-1 text-[11px] text-ink-500 hover:bg-sand-200 tap">
+                          Ajuster
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {produitsFiltres.length===0 && (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-400">Aucun produit trouvé.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* ── ENTREPÔTS ── */}
       {tab === "entrepots" && (
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-[13px] text-ink-500">{entrepotsList.length} entrepôt(s)</div>
-            <Btn onClick={ouvrirNewEntrepot}><Plus size={15} /> Nouvel entrepôt</Btn>
-          </div>
+          <div className="mb-4 text-[13px] text-ink-500">{entrepotsList.length} entrepôt(s)</div>
           {entrepotsList.length === 0 && (
             <Card className="p-6 text-center text-[13px] text-ink-400">Aucun entrepôt. Créez-en un pour commencer.</Card>
           )}
@@ -497,110 +650,6 @@ export default function BoutiquePage() {
         </div>
       )}
 
-      {/* ── FOURNISSEURS ── */}
-      {tab === "fournisseurs" && (
-        <div>
-          <div className="mb-4 flex justify-end">
-            <Btn><Plus size={15} /> Nouveau fournisseur</Btn>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {fournisseurs.map(f => (
-              <Card key={f.id} className="p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-ink">{f.nom}</span>
-                      <Badge className={f.type === "OPERATEUR" ? "bg-clay-100 text-clay-700" : "bg-sand-200 text-ink-600"}>
-                        {f.type}
-                      </Badge>
-                    </div>
-                    {f.contact && <div className="text-[12px] text-ink-400 mt-0.5">{f.contact}</div>}
-                  </div>
-                  <button className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 tap"><Edit2 size={15} /></button>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
-                  {f.telephone && <div className="text-ink-600">📞 {f.telephone}</div>}
-                  {f.email     && <div className="text-ink-600">✉ {f.email}</div>}
-                  {f.adresse   && <div className="text-ink-600">📍 {f.adresse}</div>}
-                  <div className="text-ink-600">⏱ Délai : {f.delai_livraison}j</div>
-                  <div className="text-ink-600">💳 {f.conditions_paiement}</div>
-                  {f.nb_commandes && <div className="text-ink-600">📦 {f.nb_commandes} commandes</div>}
-                </div>
-                {f.solde_du > 0 && (
-                  <div className="mt-3 rounded-xl bg-ember-100 px-3 py-2 text-[12px] text-ember-600">
-                    Dette en cours : <span className="num font-bold">{formatXOF(f.solde_du)}</span>
-                  </div>
-                )}
-                {f.derniere_commande && (
-                  <div className="mt-2 text-[11px] text-ink-400">
-                    Dernière commande : {new Date(f.derniere_commande).toLocaleDateString("fr-FR")}
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── COMMANDES FOURNISSEURS ── */}
-      {tab === "commandes" && (
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-[13px] text-ink-500">
-              {commandes.filter(c => c.statut === "validee").length} en attente de livraison
-            </div>
-            <Btn onClick={() => setOpenNouvelleCommande(true)}><Plus size={15} /> Nouvelle commande</Btn>
-          </div>
-
-          <div className="space-y-4">
-            {commandes.map(cmd => {
-              const st = STATUT_CMD[cmd.statut];
-              return (
-                <Card key={cmd.id} className="overflow-hidden">
-                  <div className="px-5 py-4 border-b border-sand-100">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-ink">{cmd.fournisseur_nom}</span>
-                          <Badge className={st.cls}>{st.label}</Badge>
-                        </div>
-                        <div className="text-[12px] text-ink-400 mt-0.5">
-                          Passée le {new Date(cmd.date_commande).toLocaleDateString("fr-FR")}
-                          {cmd.date_livraison_prevue && ` · Livraison prévue ${new Date(cmd.date_livraison_prevue).toLocaleDateString("fr-FR")}`}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="num text-lg font-semibold text-ink">{formatXOF(cmd.montant_total)}</div>
-                        <div className="flex gap-1.5 mt-1 justify-end">
-                          {cmd.statut === "brouillon" && (
-                            <button onClick={() => validerCommande(cmd.id)} className="rounded-lg bg-clay text-sand-50 px-2.5 py-1 text-[12px] font-medium hover:bg-clay-600">✓ Valider</button>
-                          )}
-                          {cmd.statut === "validee" && (
-                            <button onClick={() => receptionnerCommande(cmd)} className="rounded-lg bg-leaf-100 text-leaf-600 px-2.5 py-1 text-[12px] font-medium hover:bg-leaf-100/70">📦 Réceptionner</button>
-                          )}
-                          <button onClick={() => setOpenCommande(cmd)}
-                            className="rounded-lg bg-sand-200 text-ink-600 px-2.5 py-1 text-[12px] hover:bg-sand-300">Détail</button>
-                          <a href={`/receipt/commande/${cmd.id}`} target="_blank"
-                            className="rounded-lg bg-sand-200 text-ink-600 px-2.5 py-1 text-[12px] hover:bg-sand-300 tap">
-                            <Printer size={13} />
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Lignes */}
-                  <div className="px-5 py-3 flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-ink-500">
-                    {cmd.lignes.map(l => (
-                      <span key={l.id}>{l.produit_nom ?? l.description} ×{l.quantite}</span>
-                    ))}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ── MOUVEMENTS ── */}
       {tab === "mouvements" && (
         <div>
@@ -638,58 +687,9 @@ export default function BoutiquePage() {
         </div>
       )}
 
-      {/* ── VENTES POS ── */}
-      {tab === "ventes" && (
-        <div>
-          {/* KPIs ventes */}
-          <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { l: "CA ce mois",       v: formatXOF(stats.CAMois),    cls: "text-ink"      },
-              { l: "Marge ce mois",    v: formatXOF(stats.margeMois), cls: "text-leaf-600" },
-              { l: "Nb de ventes",     v: String(ventes.filter(v => !v.annulee).length), cls: "text-ink" },
-              { l: "Panier moyen",     v: ventes.length > 0 ? formatXOF(Math.round(ventes.reduce((s,v)=>s+v.montant_total,0)/ventes.length)) : "—", cls: "text-ink" },
-            ].map(({ l, v, cls }) => (
-              <Card key={l} className="p-4">
-                <div className="text-[12px] text-ink-400">{l}</div>
-                <div className={`num mt-1 text-xl font-semibold ${cls}`}>{v}</div>
-              </Card>
-            ))}
-          </div>
 
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-sand-200 text-[12px] uppercase tracking-wide text-ink-400">
-                    {["Numéro","Produit","Date","Qté","Total","Marge","Mode paiement",""].map(h => (
-                      <th key={h} className={`px-4 py-3 font-medium ${["Total","Marge"].includes(h) ? "text-right" : h === "Qté" ? "text-center" : "text-left"}`}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ventes.map(v => (
-                    <tr key={v.id} className={`border-b border-sand-100 last:border-0 ${v.annulee ? "opacity-50" : "hover:bg-sand-100/60"}`}>
-                      <td className="num px-4 py-3 text-ink-500">{v.numero}</td>
-                      <td className="px-4 py-3 font-medium text-ink">{v.produit_nom}</td>
-                      <td className="px-4 py-3 text-ink-500">{new Date(v.date_vente).toLocaleDateString("fr-FR")}</td>
-                      <td className="num px-4 py-3 text-center">{v.quantite}</td>
-                      <td className="num px-4 py-3 text-right font-semibold text-ink">{formatXOF(v.montant_total)}</td>
-                      <td className="num px-4 py-3 text-right text-leaf-600">+{formatXOF(v.marge)}</td>
-                      <td className="px-4 py-3"><Badge className="bg-sand-200 text-ink-600">{v.mode_paiement}</Badge></td>
-                      <td className="px-4 py-3">
-                        <a href={`/receipt/vente/${v.id}`} target="_blank" className="tap p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 inline-flex"><Printer size={14} /></a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* ── ANALYSES ── */}
-      {tab === "analyses" && (
+      {/* ── STATISTIQUES ── */}
+      {tab === "statistiques" && (
         <div>
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Valeur par catégorie */}
@@ -1014,6 +1014,61 @@ export default function BoutiquePage() {
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpenEntrepot(null)}>Annuler</Btn>
           <Btn onClick={submitEditEntrepot} className={entBusy ? "opacity-50" : ""}>{entBusy ? "…" : "Enregistrer"}</Btn>
+        </div>
+      </Modal>
+      {/* ── Modal Nouveau service ───────────────────────────────────────── */}
+      <Modal open={openNvService} onClose={()=>setOpenNvService(false)} title="Nouveau service">
+        <Field label="Nom ★"><input className={inputCls} value={svcForm.nom} onChange={e=>setSvcForm(f=>({...f,nom:e.target.value}))} placeholder="Dépôt Orange Money…"/></Field>
+        <Field label="Description"><input className={inputCls} value={svcForm.description} onChange={e=>setSvcForm(f=>({...f,description:e.target.value}))}/></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Catégorie">
+            <select className={inputCls} value={svcForm.categorie} onChange={e=>setSvcForm(f=>({...f,categorie:e.target.value}))}>
+              {Object.entries({mobile_money:"Mobile Money",transfert:"Transfert",recharge:"Recharge",sim:"SIM",credit:"Crédit",autre:"Autre"}).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
+          <Field label="Opérateur">
+            <select className={inputCls} value={svcForm.operateur_id} onChange={e=>setSvcForm(f=>({...f,operateur_id:e.target.value}))}>
+              <option value="">— Aucun —</option>
+              {(["OM","MOOV","WIZALL","WAVE","CORIS","UBA"] as any[]).map((id:any)=><option key={id} value={id}>{id}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tarif de base (XOF)"><input className={inputCls+" num"} type="number" value={svcForm.tarif_base} onChange={e=>setSvcForm(f=>({...f,tarif_base:e.target.value}))}/></Field>
+          <Field label="Commission (%)"><input className={inputCls+" num"} type="number" step="0.1" value={svcForm.commission_taux} onChange={e=>setSvcForm(f=>({...f,commission_taux:e.target.value}))}/></Field>
+        </div>
+        {svcErr && <p className="rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{svcErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={()=>setOpenNvService(false)}>Annuler</Btn>
+          <Btn onClick={()=>submitService()} className={svcBusy?"opacity-50":""}>{svcBusy?"…":"Créer"}</Btn>
+        </div>
+      </Modal>
+
+      {/* ── Modal Modifier service ──────────────────────────────────────── */}
+      <Modal open={!!openEditService} onClose={()=>setOpenEditService(null)} title={`Modifier — ${openEditService?.nom}`}>
+        <Field label="Nom"><input className={inputCls} value={svcForm.nom} onChange={e=>setSvcForm(f=>({...f,nom:e.target.value}))}/></Field>
+        <Field label="Description"><input className={inputCls} value={svcForm.description} onChange={e=>setSvcForm(f=>({...f,description:e.target.value}))}/></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Catégorie">
+            <select className={inputCls} value={svcForm.categorie} onChange={e=>setSvcForm(f=>({...f,categorie:e.target.value}))}>
+              {Object.entries({mobile_money:"Mobile Money",transfert:"Transfert",recharge:"Recharge",sim:"SIM",credit:"Crédit",autre:"Autre"}).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
+          <Field label="Opérateur">
+            <select className={inputCls} value={svcForm.operateur_id} onChange={e=>setSvcForm(f=>({...f,operateur_id:e.target.value}))}>
+              <option value="">— Aucun —</option>
+              {(["OM","MOOV","WIZALL","WAVE","CORIS","UBA"] as any[]).map((id:any)=><option key={id} value={id}>{id}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tarif (XOF)"><input className={inputCls+" num"} type="number" value={svcForm.tarif_base} onChange={e=>setSvcForm(f=>({...f,tarif_base:e.target.value}))}/></Field>
+          <Field label="Commission (%)"><input className={inputCls+" num"} type="number" step="0.1" value={svcForm.commission_taux} onChange={e=>setSvcForm(f=>({...f,commission_taux:e.target.value}))}/></Field>
+        </div>
+        {svcErr && <p className="rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{svcErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={()=>setOpenEditService(null)}>Annuler</Btn>
+          <Btn onClick={()=>submitService(openEditService)} className={svcBusy?"opacity-50":""}>{svcBusy?"…":"Enregistrer"}</Btn>
         </div>
       </Modal>
     </div>

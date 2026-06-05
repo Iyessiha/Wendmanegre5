@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Phone, MapPin, CreditCard, Plus, HandCoins } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, CreditCard, Plus, HandCoins, Wallet } from "lucide-react";
 import { useClients, usePrets, useCaisses, octroyerPret, enregistrerRemboursement } from "@/lib/hooks";
 import { getClient, SUPABASE_CONFIGURED } from "@/lib/supabase";
 import { getDemoSession } from "@/lib/demo-session";
@@ -28,6 +28,8 @@ export default function ClientDetail() {
   const [userId, setUserId] = useState<string>("");
   const [openPret, setOpenPret] = useState(false);
   const [openRemb, setOpenRemb] = useState<string | null>(null);
+  const [openRembGlobal, setOpenRembGlobal] = useState(false);
+  const [selectedPretId, setSelectedPretId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -114,7 +116,28 @@ export default function ClientDetail() {
       <PageHeader
         title={client.nom}
         subtitle={(client as any).nom_alternatif ?? undefined}
-        action={<Btn onClick={() => { setErreur(null); setOpenPret(true); }}><Plus size={16} /> Octroyer un prêt</Btn>}
+        action={
+          <div className="flex items-center gap-2">
+            {data.encours > 0 && (
+              <Btn variant="soft" onClick={() => {
+                setErreur(null);
+                const actifs = mesP.filter(p => (p.reste_a_payer ?? 0) > 0);
+                const premier = actifs[0];
+                if (premier) {
+                  setSelectedPretId(premier.id);
+                  setRembForm({ montant: String(premier.reste_a_payer ?? ""), mode: "Espèces", caisseId: caisses[0]?.id ?? "" });
+                } else {
+                  setSelectedPretId(null);
+                  setRembForm({ montant: "", mode: "Espèces", caisseId: caisses[0]?.id ?? "" });
+                }
+                setOpenRembGlobal(true);
+              }}>
+                <Wallet size={15} /> Rembourser
+              </Btn>
+            )}
+            <Btn onClick={() => { setErreur(null); setOpenPret(true); }}><Plus size={16} /> Octroyer un prêt</Btn>
+          </div>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -288,6 +311,74 @@ export default function ClientDetail() {
         <div className="mt-2 flex justify-end gap-2">
           <Btn variant="ghost" onClick={() => setOpenRemb(null)}>Annuler</Btn>
           <Btn onClick={() => openRemb && submitRemb(openRemb)} className={busy ? "opacity-50" : ""}>{busy ? "…" : "Valider"}</Btn>
+        </div>
+      </Modal>
+      {/* ── Modal remboursement global (depuis le bouton header) ──────────── */}
+      <Modal open={openRembGlobal} onClose={() => setOpenRembGlobal(false)} title={`Rembourser — ${client.nom}`}>
+        {/* Liste des prêts actifs */}
+        <div className="mb-4">
+          <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-ink-400">Prêts en cours</p>
+          {mesP.filter(p => (p.reste_a_payer ?? 0) > 0).length === 0 && (
+            <p className="rounded-xl bg-sand-100 px-4 py-3 text-[13px] text-ink-400">Aucun prêt impayé.</p>
+          )}
+          <div className="space-y-2 max-h-48 overflow-auto">
+            {mesP.filter(p => (p.reste_a_payer ?? 0) > 0).map(p => {
+              const sel = selectedPretId === p.id;
+              return (
+                <button key={p.id} onClick={() => {
+                  setSelectedPretId(p.id);
+                  setRembForm(f => ({ ...f, montant: String(p.reste_a_payer ?? "") }));
+                }}
+                  className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-all
+                    ${sel ? "border-leaf-400 bg-leaf-50 ring-2 ring-leaf-300" : "border-sand-200 bg-white/70 hover:bg-sand-50"}`}>
+                  <div>
+                    <div className="text-[13px] font-semibold text-ink">{p.id}</div>
+                    <div className="text-[12px] text-ink-500">{p.type_operation} · octroyé {formatDate(p.date_octroi)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="num text-[13px] font-bold text-clay-700">{formatXOF(p.reste_a_payer ?? 0)}</div>
+                    <div className="text-[11px] text-ink-400">restant</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Formulaire de remboursement */}
+        {selectedPretId && (
+          <>
+            <div className="mb-3 rounded-xl bg-sand-100 px-4 py-2.5 text-[12px] text-ink-500">
+              Prêt sélectionné : <span className="num font-semibold text-ink">{selectedPretId}</span>
+            </div>
+            <Field label="Montant reçu (XOF)">
+              <input className={inputCls + " num"} type="number" autoFocus
+                value={rembForm.montant} onChange={e => setRembForm({ ...rembForm, montant: e.target.value })} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Mode de paiement">
+                <select className={inputCls} value={rembForm.mode} onChange={e => setRembForm({ ...rembForm, mode: e.target.value })}>
+                  {["Espèces", "Orange Money", "Moov Money", "Versement", "Virement", "Chèque"].map(m => <option key={m}>{m}</option>)}
+                </select>
+              </Field>
+              <Field label="Caisse créditée">
+                <select className={inputCls} value={rembForm.caisseId} onChange={e => setRembForm({ ...rembForm, caisseId: e.target.value })}>
+                  {caisses.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                </select>
+              </Field>
+            </div>
+          </>
+        )}
+
+        {erreur && <p className="mt-2 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{erreur}</p>}
+        <div className="mt-3 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={() => setOpenRembGlobal(false)}>Annuler</Btn>
+          <Btn
+            onClick={async () => { if (!selectedPretId) return; await submitRemb(selectedPretId); setOpenRembGlobal(false); }}
+            className={(!selectedPretId || busy) ? "opacity-50" : ""}
+            disabled={!selectedPretId || busy}>
+            {busy ? "…" : "Valider le remboursement"}
+          </Btn>
         </div>
       </Modal>
     </div>

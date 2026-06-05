@@ -23,9 +23,9 @@ const FILTRES = [
   { v: "validee", l: "Validées" }, { v: "payee", l: "Payées" }, { v: "annulee", l: "Annulées" },
 ];
 
-export default function FacturationModule({ docType, embedded = false }: { docType: TypeDoc; embedded?: boolean }) {
+export default function FacturationModule({ docType, embedded = false, initialStatut = "tous", labelNouveauBtn }: { docType: TypeDoc; embedded?: boolean; initialStatut?: string; labelNouveauBtn?: string }) {
   const type = docType;
-  const [statut, setStatut] = useState("tous");
+  const [statut, setStatut] = useState(initialStatut);
   const { data: factures, refetch } = useFactures({ type, statut: statut === "impayes" ? "tous" : statut });
   const { data: clients } = useClients();
   const { data: caisses } = useCaisses();

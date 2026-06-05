@@ -1,268 +1,339 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Plus, MapPin, ChevronRight, Edit2, Power, Download } from "lucide-react";
+import {
+  Search, Plus, MapPin, ChevronRight, Edit2, Power,
+  Truck, Phone, Mail, Building2, AlertTriangle,
+} from "lucide-react";
 import { useClients, usePrets, upsertClient } from "@/lib/hooks";
+import { useFournisseurs } from "@/lib/hooks-stock";
+import { getClient } from "@/lib/supabase";
 import { PageHeader, Card, Btn, Modal, Field, inputCls, Badge } from "@/components/ui";
-import { DataTable, type Column } from "@/components/DataTable";
 import { formatXOF } from "@/lib/format";
+import { useRealtimeRefetch } from "@/lib/realtime";
 
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+const TABS = [
+  { id:"commercants", label:"Commerçants",  icon:Building2 },
+  { id:"fournisseurs",label:"Fournisseurs", icon:Truck     },
+] as const;
+type TabId = typeof TABS[number]["id"];
+
+const TYPE_BADGE: Record<string,string> = {
+  OPERATEUR:   "bg-orange-100 text-orange-700",
+  DISTRIBUTEUR:"bg-blue-100 text-blue-700",
+  FABRICANT:   "bg-purple-100 text-purple-700",
+  AUTRE:       "bg-sand-200 text-ink-500",
+};
+
+// ── Page principale ───────────────────────────────────────────────────────────
 export default function ClientsPage() {
-  const { data: clients, loading, refetch } = useClients();
+  const [tab, setTab] = useState<TabId>("commercants");
+
+  // ── Commerçants ────────────────────────────────────────────────────────────
+  const { data: clients, loading: loadClients, refetch: rfClients } = useClients();
   const { data: prets } = usePrets();
   const [q, setQ] = useState("");
-  const [filtre, setFiltre] = useState<"tous" | "actifs" | "inactifs" | "depassement">("tous");
+  const [filtre, setFiltre] = useState<"tous"|"actifs"|"inactifs"|"depassement">("tous");
   const [openNew, setOpenNew] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string|null>(null);
   const [saving, setSaving] = useState(false);
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [form, setForm] = useState({ id: "", nom: "", nom_alternatif: "", ville: "", telephone: "", plafond: "", identifiant_pro1: "", identifiant_pro2: "", actif: true });
+  const [erreur, setErreur] = useState<string|null>(null);
+  const [form, setForm] = useState({ id:"", nom:"", nom_alternatif:"", ville:"", telephone:"", plafond:"", identifiant_pro1:"", identifiant_pro2:"", actif:true });
 
-  type Row = (typeof clients)[number] & { encours: number; nbPrets: number };
+  type Row = (typeof clients)[number] & { encours:number; nbPrets:number };
 
   const rows: Row[] = useMemo(() => clients.map(c => {
     const sesPrets = prets.filter(p => p.client_id === c.id);
-    const encours = sesPrets
-      .filter(p => p.statut !== "rembourse" && p.statut !== "annule")
-      .reduce((s, p) => s + (p.reste_a_payer ?? 0), 0);
-    return { ...c, encours, nbPrets: sesPrets.length };
-  })
-  .filter(c => {
+    const encours = sesPrets.filter(p => p.statut!=="rembourse"&&p.statut!=="annule").reduce((s,p)=>s+(p.reste_a_payer??0),0);
+    return { ...c, encours, nbPrets:sesPrets.length };
+  }).filter(c => {
     const texte = c.nom.toLowerCase().includes(q.toLowerCase()) ||
       c.id.toLowerCase().includes(q.toLowerCase()) ||
-      c.ville.toLowerCase().includes(q.toLowerCase());
+      (c.ville??"").toLowerCase().includes(q.toLowerCase());
     if (!texte) return false;
-    if (filtre === "actifs") return c.actif !== false;
-    if (filtre === "inactifs") return c.actif === false;
-    if (filtre === "depassement") return c.plafond > 0 && c.encours > c.plafond;
+    if (filtre==="actifs")      return c.actif !== false;
+    if (filtre==="inactifs")    return c.actif === false;
+    if (filtre==="depassement") return (c.plafond??0)>0 && c.encours>(c.plafond??0);
     return true;
-  })
-  .sort((a, b) => b.encours - a.encours), [clients, prets, q, filtre]);
+  }).sort((a,b) => b.encours - a.encours), [clients, prets, q, filtre]);
 
-  const stats = useMemo(() => {
-    const actifs = clients.filter((c: any) => c.actif !== false).length;
-    const encoursTotal = rows.reduce((s, r) => s + r.encours, 0);
-    const depass = rows.filter(r => r.plafond > 0 && r.encours > r.plafond).length;
-    return { total: clients.length, actifs, encoursTotal, depass };
-  }, [clients, rows]);
-
-  const columns: Column<Row>[] = [
-    {
-      key: "nom", label: "Commerçant", mobilePrimary: true,
-      render: r => (
-        <div>
-          <Link href={`/clients/${encodeURIComponent(r.id)}`} className="font-medium text-ink hover:text-clay">{r.nom}</Link>
-          <div className="num text-[11px] text-ink-400">{r.id}</div>
-        </div>
-      ),
-    },
-    {
-      key: "ville", label: "Localité", mobileSecondary: true,
-      render: r => (
-        <span className="inline-flex items-center gap-1 text-ink-700">
-          <MapPin size={12} className="text-ink-400" />{r.ville}
-        </span>
-      ),
-    },
-    {
-      key: "plafond", label: "Plafond", mobileHide: true,
-      render: r => {
-        const pct = r.plafond > 0 ? Math.min(100, (r.encours / r.plafond) * 100) : 0;
-        return (
-          <div>
-            <div className="num text-[13px]">{formatXOF(r.plafond)}</div>
-            <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-sand-200">
-              <div className={`h-full rounded-full ${pct > 85 ? "bg-ember" : pct > 60 ? "bg-gold" : "bg-leaf"}`} style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: "encours", label: "Encours", align: "right",
-      render: r => <span className={`num font-semibold ${r.encours > 0 ? "text-clay-700" : "text-ink-300"}`}>{formatXOF(r.encours)}</span>,
-    },
-    {
-      key: "prets", label: "Prêts", align: "right", mobileHide: true,
-      render: r => <span className="num text-ink-500">{r.nbPrets}</span>,
-    },
-    {
-      key: "action", label: "", align: "right", mobileHide: true,
-      render: r => (
-        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-          {r.actif === false && <Badge className="bg-ember-100 text-ember-600 mr-1">Inactif</Badge>}
-          <button onClick={() => ouvrirEdit(r)} title="Modifier" className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ink"><Edit2 size={15} /></button>
-          <button onClick={() => toggleActif(r)} title={r.actif === false ? "Réactiver" : "Désactiver"} className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ember-600"><Power size={15} /></button>
-          <Link href={`/clients/${encodeURIComponent(r.id)}`} title="Détail" className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 hover:text-ink inline-flex"><ChevronRight size={16} /></Link>
-        </div>
-      ),
-    },
-  ];
-
-  function resetForm() { setForm({ id: "", nom: "", nom_alternatif: "", ville: "", telephone: "", plafond: "", identifiant_pro1: "", identifiant_pro2: "", actif: true }); }
-  function ouvrirNew() { setErreur(null); setEditId(null); resetForm(); setOpenNew(true); }
+  function ouvrirNew() {
+    setErreur(null);
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth()+1).padStart(2,"0");
+    const n = String(clients.length+1).padStart(5,"0");
+    setForm({ id:`CU${yy}${mm}-${n}`, nom:"", nom_alternatif:"", ville:"Yako", telephone:"", plafond:"500000", identifiant_pro1:"", identifiant_pro2:"", actif:true });
+    setEditId(null); setOpenNew(true);
+  }
   function ouvrirEdit(c: any) {
-    setErreur(null); setEditId(c.id);
-    setForm({
-      id: c.id, nom: c.nom ?? "", nom_alternatif: c.nom_alternatif ?? "", ville: c.ville ?? "",
-      telephone: c.telephone ?? "", plafond: String(c.plafond ?? ""), identifiant_pro1: c.identifiant_pro1 ?? "",
-      identifiant_pro2: c.identifiant_pro2 ?? "", actif: c.actif !== false,
-    });
-    setOpenNew(true);
+    setErreur(null);
+    setForm({ id:c.id, nom:c.nom, nom_alternatif:c.nom_alternatif??"", ville:c.ville??"", telephone:c.telephone??"", plafond:String(c.plafond??500000), identifiant_pro1:c.identifiant_pro1??"", identifiant_pro2:c.identifiant_pro2??"", actif:c.actif!==false });
+    setEditId(c.id); setOpenNew(true);
   }
-  async function toggleActif(c: any) {
-    const actif = !(c.actif !== false);
-    if (!confirm(actif ? `Réactiver ${c.nom} ?` : `Désactiver ${c.nom} ? Il n'apparaîtra plus dans les listes actives.`)) return;
-    try { await upsertClient({ id: c.id, actif } as any); refetch(); } catch (e: any) { alert(e?.message ?? "Erreur."); }
-  }
-  function exporterCSV() {
-    const entetes = ["Code", "Nom", "Localité", "Téléphone", "Plafond", "Encours", "Prêts", "Actif"];
-    const lignes = rows.map(r => [r.id, r.nom, r.ville, (r as any).telephone ?? "", r.plafond, r.encours, r.nbPrets, r.actif === false ? "Non" : "Oui"]);
-    const csv = [entetes, ...lignes].map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = `commercants-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
-  }
-
-  async function submit() {
-    if (!form.nom || !form.ville) { setErreur("Le nom et la localité sont requis."); return; }
+  async function sauvegarder() {
+    if (!form.nom.trim()) { setErreur("Nom requis."); return; }
     setSaving(true); setErreur(null);
     try {
-      await upsertClient({
-        id: editId || form.id || "CU" + Math.floor(1000 + Math.random() * 8999) + "-" + Math.floor(10000 + Math.random() * 89999),
-        nom: form.nom.toUpperCase(),
-        nom_alternatif: form.nom_alternatif || null,
-        ville: form.ville,
-        telephone: form.telephone || null,
-        plafond: Number(form.plafond) || 500_000,
-        identifiant_pro1: form.identifiant_pro1 || null,
-        identifiant_pro2: form.identifiant_pro2 || null,
-        actif: form.actif,
-      } as any);
-      resetForm(); setEditId(null); setOpenNew(false); refetch();
-    } catch (e: any) {
-      setErreur(e?.message ?? "Erreur lors de l'enregistrement.");
-    }
+      await upsertClient({ id:form.id, nom:form.nom.trim(), nom_alternatif:form.nom_alternatif||undefined, ville:form.ville||"Yako", telephone:form.telephone||undefined, plafond:Number(form.plafond)||500000, identifiant_pro1:form.identifiant_pro1||undefined, identifiant_pro2:form.identifiant_pro2||undefined, actif:form.actif });
+      setOpenNew(false); rfClients();
+    } catch(e:any){ setErreur(e?.message??"Erreur."); }
     setSaving(false);
   }
+
+  const nbActifs = useMemo(()=>clients.filter(c=>c.actif!==false).length,[clients]);
+  const encoursTot = useMemo(()=>rows.reduce((s,r)=>s+r.encours,0),[rows]);
+
+  // ── Fournisseurs ───────────────────────────────────────────────────────────
+  const { data: fournisseurs, refetch: rfFourn } = useFournisseurs();
+  const [qF, setQF] = useState("");
+  const [openNewF, setOpenNewF] = useState(false);
+  const [editF, setEditF] = useState<any|null>(null);
+  const [fBusy, setFBusy] = useState(false);
+  const [fErr, setFErr] = useState<string|null>(null);
+  const [fForm, setFForm] = useState({ nom:"", type:"OPERATEUR", telephone:"", email:"", adresse:"", contact:"", delai_livraison:"3", conditions_paiement:"Avance", notes:"" });
+
+  const fournFiltrés = useMemo(()=>fournisseurs.filter(f=>(f.nom??"").toLowerCase().includes(qF.toLowerCase())||(f.type??"").toLowerCase().includes(qF.toLowerCase())),[fournisseurs,qF]);
+
+  function ouvrirNewF() { setFErr(null); setFForm({nom:"",type:"OPERATEUR",telephone:"",email:"",adresse:"",contact:"",delai_livraison:"3",conditions_paiement:"Avance",notes:""}); setEditF(null); setOpenNewF(true); }
+  function ouvrirEditF(f:any) { setFErr(null); setFForm({nom:f.nom,type:f.type,telephone:f.telephone??"",email:f.email??"",adresse:f.adresse??"",contact:f.contact??"",delai_livraison:String(f.delai_livraison??"3"),conditions_paiement:f.conditions_paiement??"Avance",notes:f.notes??""}); setEditF(f); setOpenNewF(true); }
+
+  async function sauvegarderF() {
+    if (!fForm.nom.trim()) { setFErr("Nom requis."); return; }
+    setFBusy(true); setFErr(null);
+    const sb = getClient() as any;
+    const payload = { nom:fForm.nom.trim(), type:fForm.type, telephone:fForm.telephone||null, email:fForm.email||null, adresse:fForm.adresse||null, contact:fForm.contact||null, delai_livraison:Number(fForm.delai_livraison)||3, conditions_paiement:fForm.conditions_paiement, notes:fForm.notes||null, actif:true };
+    if (editF) await sb.from("fournisseurs").update(payload).eq("id",editF.id);
+    else await sb.from("fournisseurs").insert(payload);
+    setOpenNewF(false); rfFourn(); setFBusy(false);
+  }
+
+  // ── Header action contextuel ───────────────────────────────────────────────
+  const headerAction = tab==="commercants" ? (
+    <Btn onClick={ouvrirNew}><Plus size={15}/> Nouveau commerçant</Btn>
+  ) : (
+    <Btn onClick={ouvrirNewF}><Plus size={15}/> Nouveau fournisseur</Btn>
+  );
 
   return (
     <div className="animate-fade-up">
       <PageHeader
-        title="Commerçants"
-        subtitle={`${clients.length} sous-distributeurs dans le réseau`}
-        action={
-          <div className="flex gap-2">
-            <Btn variant="ghost" onClick={exporterCSV} className="tap"><Download size={16} /> <span className="hidden sm:inline">Exporter</span></Btn>
-            <Btn onClick={ouvrirNew} className="tap"><Plus size={16} /> <span className="hidden sm:inline">Nouveau commerçant</span></Btn>
-          </div>
-        }
+        title={tab==="commercants" ? "Commerçants" : "Fournisseurs"}
+        subtitle={tab==="commercants"
+          ? `${nbActifs} actifs · encours ${formatXOF(encoursTot)}`
+          : `${fournisseurs.filter(f=>f.actif).length} fournisseurs actifs`}
+        action={headerAction}
       />
 
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { l: "Commerçants", v: String(stats.total) },
-          { l: "Actifs", v: String(stats.actifs) },
-          { l: "Encours réseau", v: formatXOF(stats.encoursTotal) },
-          { l: "Dépassements", v: String(stats.depass), alerte: stats.depass > 0 },
-        ].map((s, i) => (
-          <Card key={i} className="p-4">
-            <div className="text-[12px] text-ink-400">{s.l}</div>
-            <div className={`num mt-1 text-xl font-bold ${s.alerte ? "text-ember-600" : "text-ink"}`}>{s.v}</div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="mb-4 flex items-center gap-2 rounded-xl border border-sand-200 bg-white/70 px-3.5 py-2.5 shadow-card">
-        <Search size={17} className="text-ink-400 flex-shrink-0" />
-        <input value={q} onChange={e => setQ(e.target.value)}
-          placeholder="Rechercher nom, code ou ville…"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400" />
-      </div>
-
-      <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1">
-        {([["tous", "Tous"], ["actifs", "Actifs"], ["inactifs", "Inactifs"], ["depassement", "En dépassement"]] as const).map(([v, l]) => (
-          <button key={v} onClick={() => setFiltre(v)}
-            className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${filtre === v ? "bg-clay text-sand-50" : "bg-white/70 border border-sand-200 text-ink-500 hover:bg-sand-200"}`}>
-            {l}
+      {/* Tabs */}
+      <div className="mb-5 flex gap-2">
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium transition-colors
+              ${tab===t.id?"bg-clay text-sand-50":"bg-white/70 border border-sand-200 text-ink-600 hover:bg-sand-100"}`}>
+            <t.icon size={14}/> {t.label}
           </button>
         ))}
       </div>
 
-      <Card className="overflow-hidden">
-        <DataTable
-          columns={columns}
-          data={rows}
-          rowKey={r => r.id}
-          onRowClick={r => { window.location.href = `/clients/${encodeURIComponent(r.id)}`; }}
-          emptyMessage={loading ? "Chargement…" : "Aucun commerçant trouvé."}
-          mobileCard={r => {
-            const pct = r.plafond > 0 ? Math.min(100, (r.encours / r.plafond) * 100) : 0;
-            return (
-              <Link href={`/clients/${encodeURIComponent(r.id)}`} className="block">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-ink">{r.nom}</div>
-                    <div className="num text-[11px] text-ink-400">{r.id}</div>
-                    <div className="mt-1 flex items-center gap-2 text-[12px] text-ink-500">
-                      <MapPin size={11} />{r.ville} · {r.nbPrets} prêt{r.nbPrets > 1 ? "s" : ""}
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0 text-right">
-                    <div className={`num text-[15px] font-semibold ${r.encours > 0 ? "text-clay-700" : "text-ink-300"}`}>
-                      {formatXOF(r.encours)}
-                    </div>
-                    <div className="mt-1 h-1.5 w-16 overflow-hidden rounded-full bg-sand-200 ml-auto">
-                      <div className={`h-full rounded-full ${pct > 85 ? "bg-ember" : pct > 60 ? "bg-gold" : "bg-leaf"}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="text-[10px] text-ink-400 mt-0.5">{formatXOF(r.plafond)} plafond</div>
-                  </div>
-                </div>
-              </Link>
-            );
-          }}
-        />
-      </Card>
+      {/* ── COMMERÇANTS ───────────────────────────────────────────────────── */}
+      {tab==="commercants" && (
+        <div>
+          {/* Filtres */}
+          <div className="mb-4 flex flex-wrap gap-2">
+            <div className="flex flex-1 items-center gap-2 rounded-xl border border-sand-200 bg-white/70 px-3.5 py-2.5">
+              <Search size={16} className="text-ink-400"/>
+              <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Nom, ID, ville…" className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"/>
+            </div>
+            {(["tous","actifs","inactifs","depassement"] as const).map(f=>(
+              <button key={f} onClick={()=>setFiltre(f)}
+                className={`rounded-xl px-3 py-2 text-[13px] font-medium ${filtre===f?"bg-clay text-sand-50":"bg-white/70 border border-sand-200 text-ink-600 hover:bg-sand-100"}`}>
+                {f==="depassement"?"⚠ Dépassement":f.charAt(0).toUpperCase()+f.slice(1)}
+              </button>
+            ))}
+          </div>
 
-      <Modal open={openNew} onClose={() => setOpenNew(false)} title={editId ? `Modifier — ${form.nom}` : "Nouveau commerçant"}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Nom complet">
-            <input className={inputCls} value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} placeholder="OUEDRAOGO Boukary" />
-          </Field>
-          <Field label="Nom commercial (optionnel)">
-            <input className={inputCls} value={form.nom_alternatif} onChange={e => setForm({ ...form, nom_alternatif: e.target.value })} placeholder="Boutique Centre" />
-          </Field>
+          {/* Liste commerçants */}
+          <div className="space-y-2">
+            {rows.slice(0,100).map(c => {
+              const depasse = (c.plafond??0)>0 && c.encours>(c.plafond??0);
+              return (
+                <Card key={c.id} className={`overflow-hidden transition-all hover:shadow-md ${!c.actif?"opacity-55":""}`}>
+                  <div className="flex items-center gap-3 p-4">
+                    {/* Avatar */}
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-bold
+                      ${depasse?"bg-ember-100 text-ember-700":"bg-clay-100 text-clay-700"}`}>
+                      {c.nom.charAt(0).toUpperCase()}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-ink truncate">{c.nom}</span>
+                        {depasse && <AlertTriangle size={13} className="shrink-0 text-ember-500"/>}
+                        {!c.actif && <Badge className="bg-sand-200 text-ink-400">Inactif</Badge>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-[12px] text-ink-400">
+                        {c.ville && <span className="flex items-center gap-1"><MapPin size={11}/>{c.ville}</span>}
+                        {c.telephone && <span className="num">{c.telephone}</span>}
+                        <span className="num text-ink-300">{c.id}</span>
+                      </div>
+                    </div>
+                    {/* Encours */}
+                    <div className="shrink-0 text-right hidden sm:block">
+                      {c.encours > 0 && (
+                        <>
+                          <div className={`num text-[13px] font-bold ${depasse?"text-ember-600":"text-clay-700"}`}>{formatXOF(c.encours)}</div>
+                          <div className="text-[11px] text-ink-400">encours</div>
+                        </>
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div className="shrink-0 flex items-center gap-1">
+                      <button onClick={()=>ouvrirEdit(c)} className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 tap"><Edit2 size={14}/></button>
+                      <Link href={`/clients/${c.id}`} className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 tap"><ChevronRight size={15}/></Link>
+                    </div>
+                  </div>
+                  {/* Barre encours */}
+                  {(c.plafond??0) > 0 && c.encours > 0 && (
+                    <div className="h-1 bg-sand-100">
+                      <div className={`h-1 ${depasse?"bg-ember-500":"bg-clay"}`} style={{width:`${Math.min(100,c.encours/(c.plafond??1)*100)}%`}}/>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+            {rows.length === 0 && !loadClients && (
+              <Card className="p-10 text-center text-[13px] text-ink-400">Aucun commerçant trouvé.</Card>
+            )}
+            {rows.length > 100 && (
+              <div className="text-center text-[12px] text-ink-400 py-2">… {rows.length-100} autres commerçants — affinez la recherche</div>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Localité">
-            <input className={inputCls} value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} placeholder="Yako" />
-          </Field>
-          <Field label="Téléphone">
-            <input className={inputCls + " num"} value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} placeholder="+226..." />
-          </Field>
+      )}
+
+      {/* ── FOURNISSEURS ──────────────────────────────────────────────────── */}
+      {tab==="fournisseurs" && (
+        <div>
+          {/* Résumé */}
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { l:"Total",         v:String(fournisseurs.length) },
+              { l:"Actifs",        v:String(fournisseurs.filter(f=>f.actif).length) },
+              { l:"Dettes totales",v:formatXOF(fournisseurs.reduce((s,f)=>s+(f.solde_du??0),0)), accent:true },
+              { l:"Commandes passées",v:String(fournisseurs.reduce((s,f)=>s+(f.nb_commandes??0),0)) },
+            ].map(s=>(
+              <Card key={s.l} className="p-4">
+                <div className="text-[12px] text-ink-400">{s.l}</div>
+                <div className={`num mt-1 text-xl font-bold ${(s as any).accent&&fournisseurs.some(f=>(f.solde_du??0)>0)?"text-clay-700":"text-ink"}`}>{s.v}</div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Recherche */}
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-sand-200 bg-white/70 px-3.5 py-2.5">
+            <Search size={15} className="text-ink-400"/>
+            <input value={qF} onChange={e=>setQF(e.target.value)} placeholder="Rechercher un fournisseur…" className="w-full bg-transparent text-[13px] outline-none placeholder:text-ink-400"/>
+          </div>
+
+          {/* Liste fournisseurs */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {fournFiltrés.map(f=>(
+              <Card key={f.id} className={`p-5 ${!f.actif?"opacity-55":""}`}>
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-ink truncate">{f.nom}</span>
+                      <Badge className={TYPE_BADGE[f.type]??'bg-sand-200 text-ink-500'}>{f.type}</Badge>
+                    </div>
+                    {f.contact && <div className="text-[12px] text-ink-400 mt-0.5">{f.contact}</div>}
+                  </div>
+                  <button onClick={()=>ouvrirEditF(f)} className="p-1.5 rounded-lg hover:bg-sand-200 text-ink-400 shrink-0 tap"><Edit2 size={14}/></button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
+                  {f.telephone && <div className="flex items-center gap-1.5 text-ink-600"><Phone size={11} className="text-ink-300"/>{f.telephone}</div>}
+                  {f.email     && <div className="flex items-center gap-1.5 text-ink-600"><Mail size={11} className="text-ink-300"/>{f.email}</div>}
+                  {f.adresse   && <div className="flex items-center gap-1.5 text-ink-600 col-span-2"><MapPin size={11} className="text-ink-300"/>{f.adresse}</div>}
+                  <div className="text-ink-500">⏱ Délai : <span className="font-medium">{f.delai_livraison}j</span></div>
+                  <div className="text-ink-500">💳 {f.conditions_paiement}</div>
+                  {f.nb_commandes && <div className="text-ink-500">📦 {f.nb_commandes} commandes</div>}
+                </div>
+                {(f.solde_du??0) > 0 && (
+                  <div className="mt-3 rounded-xl bg-ember-50 border border-ember-200 px-3 py-2 text-[12px] text-ember-600">
+                    Dette en cours : <span className="num font-bold">{formatXOF(f.solde_du)}</span>
+                  </div>
+                )}
+                {f.derniere_commande && (
+                  <div className="mt-2 text-[11px] text-ink-400">Dernière commande : {new Date(f.derniere_commande).toLocaleDateString("fr-FR")}</div>
+                )}
+              </Card>
+            ))}
+            {fournFiltrés.length===0 && <Card className="p-10 text-center text-[13px] text-ink-400 sm:col-span-2">Aucun fournisseur.</Card>}
+          </div>
         </div>
-        <Field label="Plafond de crédit (XOF)">
-          <input className={inputCls + " num"} type="number" value={form.plafond} onChange={e => setForm({ ...form, plafond: e.target.value })} placeholder="500000" />
-        </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="N° identifiant pro 1 (optionnel)">
-            <input className={inputCls} value={form.identifiant_pro1} onChange={e => setForm({ ...form, identifiant_pro1: e.target.value })} />
-          </Field>
-          <Field label="N° identifiant pro 2 (optionnel)">
-            <input className={inputCls} value={form.identifiant_pro2} onChange={e => setForm({ ...form, identifiant_pro2: e.target.value })} />
-          </Field>
+      )}
+
+      {/* ── Modal Commerçant ──────────────────────────────────────────────── */}
+      <Modal open={openNew} onClose={()=>setOpenNew(false)} title={editId ? `Modifier — ${form.nom}` : "Nouveau commerçant"}>
+        <Field label="Nom complet ★"><input className={inputCls} value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} autoFocus/></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Nom alternatif"><input className={inputCls} value={form.nom_alternatif} onChange={e=>setForm(f=>({...f,nom_alternatif:e.target.value}))}/></Field>
+          <Field label="Ville"><input className={inputCls} value={form.ville} onChange={e=>setForm(f=>({...f,ville:e.target.value}))}/></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Téléphone"><input className={inputCls+" num"} value={form.telephone} onChange={e=>setForm(f=>({...f,telephone:e.target.value}))}/></Field>
+          <Field label="Plafond crédit (XOF)"><input className={inputCls+" num"} type="number" value={form.plafond} onChange={e=>setForm(f=>({...f,plafond:e.target.value}))}/></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="CNIB / ID pro 1"><input className={inputCls+" num"} value={form.identifiant_pro1} onChange={e=>setForm(f=>({...f,identifiant_pro1:e.target.value}))}/></Field>
+          <Field label="ID pro 2"><input className={inputCls+" num"} value={form.identifiant_pro2} onChange={e=>setForm(f=>({...f,identifiant_pro2:e.target.value}))}/></Field>
         </div>
         {editId && (
-          <label className="mt-1 flex items-center gap-2 text-[13px] text-ink-600">
-            <input type="checkbox" checked={form.actif} onChange={e => setForm({ ...form, actif: e.target.checked })} />
-            Commerçant actif
-          </label>
+          <div className="flex items-center gap-2 pt-1">
+            <input type="checkbox" id="actif" checked={form.actif} onChange={e=>setForm(f=>({...f,actif:e.target.checked}))}/>
+            <label htmlFor="actif" className="text-[13px] text-ink">Commerçant actif</label>
+          </div>
         )}
         {erreur && <p className="mt-1 rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{erreur}</p>}
         <div className="mt-2 flex justify-end gap-2">
-          <Btn variant="ghost" onClick={() => setOpenNew(false)}>Annuler</Btn>
-          <Btn onClick={submit} className={saving ? "opacity-50" : ""}>{saving ? "Enregistrement…" : editId ? "Enregistrer" : "Créer"}</Btn>
+          <Btn variant="ghost" onClick={()=>setOpenNew(false)}>Annuler</Btn>
+          <Btn onClick={sauvegarder} className={saving?"opacity-50":""}>{saving?"…":"Enregistrer"}</Btn>
+        </div>
+      </Modal>
+
+      {/* ── Modal Fournisseur ─────────────────────────────────────────────── */}
+      <Modal open={openNewF} onClose={()=>setOpenNewF(false)} title={editF ? `Modifier — ${editF.nom}` : "Nouveau fournisseur"}>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Nom ★"><input className={inputCls} value={fForm.nom} onChange={e=>setFForm(f=>({...f,nom:e.target.value}))} autoFocus/></Field>
+          <Field label="Type">
+            <select className={inputCls} value={fForm.type} onChange={e=>setFForm(f=>({...f,type:e.target.value}))}>
+              {["OPERATEUR","DISTRIBUTEUR","FABRICANT","AUTRE"].map(t=><option key={t}>{t}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Téléphone"><input className={inputCls+" num"} value={fForm.telephone} onChange={e=>setFForm(f=>({...f,telephone:e.target.value}))}/></Field>
+          <Field label="Email"><input className={inputCls} type="email" value={fForm.email} onChange={e=>setFForm(f=>({...f,email:e.target.value}))}/></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Contact (personne)"><input className={inputCls} value={fForm.contact} onChange={e=>setFForm(f=>({...f,contact:e.target.value}))}/></Field>
+          <Field label="Adresse"><input className={inputCls} value={fForm.adresse} onChange={e=>setFForm(f=>({...f,adresse:e.target.value}))}/></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Délai livraison (jours)"><input className={inputCls+" num"} type="number" value={fForm.delai_livraison} onChange={e=>setFForm(f=>({...f,delai_livraison:e.target.value}))}/></Field>
+          <Field label="Conditions paiement">
+            <select className={inputCls} value={fForm.conditions_paiement} onChange={e=>setFForm(f=>({...f,conditions_paiement:e.target.value}))}>
+              {["Avance","À réception","Espèces","30 jours","Virement"].map(c=><option key={c}>{c}</option>)}
+            </select>
+          </Field>
+        </div>
+        <Field label="Notes"><textarea className={inputCls} rows={2} value={fForm.notes} onChange={e=>setFForm(f=>({...f,notes:e.target.value}))}/></Field>
+        {fErr && <p className="rounded-lg bg-ember-100 px-3 py-2 text-[12px] text-ember-600">{fErr}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Btn variant="ghost" onClick={()=>setOpenNewF(false)}>Annuler</Btn>
+          <Btn onClick={sauvegarderF} className={fBusy?"opacity-50":""}>{fBusy?"…":"Enregistrer"}</Btn>
         </div>
       </Modal>
     </div>
